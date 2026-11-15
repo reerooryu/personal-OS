@@ -7,6 +7,7 @@
 import { Award, Check, ChevronUp, Sparkles, Star, Trophy, Undo2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
+import { track } from "@/lib/usage-client";
 import { deleteActivityAction } from "@/app/actions";
 import { Progress } from "@/components/ui/progress";
 import { cn, fmt } from "@/lib/utils";
@@ -187,7 +188,10 @@ export function RewardProvider({ children }: { children: React.ReactNode }) {
         for (const c of celebrationsFor(reward)) queue.current.push({ ...c, id: ++seq.current });
         if (!celebration && queue.current.length) nextCelebration();
       },
-      error: (message) => push({ kind: "error", message }, 7000),
+      error: (message) => {
+        track("error", message);
+        push({ kind: "error", message }, 7000);
+      },
       info: (message) => push({ kind: "info", message }, 4000),
     }),
     [push, celebration, nextCelebration],

@@ -3,6 +3,7 @@ import { Square, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { cancelTimerAction, stopTimerAction } from "@/app/actions";
+import { track } from "@/lib/usage-client";
 import { useReward } from "@/components/reward/reward-provider";
 import { Button } from "@/components/ui/button";
 
@@ -32,6 +33,7 @@ export function TimerBar({ name, startedAt }: { name: string; startedAt: number 
       }
       return reward.error(r.error);
     }
+    track("save", "timer", { ms: 0, meta: { minutes: Math.round((Date.now() - startedAt) / 60_000) } });
     reward.reward(r.reward, { title: r.name, activityId: r.activityId });
     router.refresh();
   }

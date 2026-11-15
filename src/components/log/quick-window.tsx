@@ -2,21 +2,20 @@
 import { Check } from "lucide-react";
 import * as React from "react";
 import { RewardProvider } from "@/components/reward/reward-provider";
+import { track } from "@/lib/usage-client";
 import { fmt } from "@/lib/utils";
 import type { QuickLogOptions } from "@/services/views";
 import { QuickLog } from "./quick-log";
 
-declare global {
-  interface Window {
-    ascend?: { desktop: boolean; hideQuick: () => void };
-  }
-}
 
 /** The compact bar opened by the global shortcut: pick, Log, see the result, done. */
 export function QuickWindow({ options }: { options: QuickLogOptions }) {
   const [done, setDone] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const hide = React.useCallback(() => window.ascend?.hideQuick(), []);
+  React.useEffect(() => {
+    track("open", "quick-log", { meta: { via: "shortcut window" } });
+  }, []);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && hide();
     window.addEventListener("keydown", onKey);
@@ -34,6 +33,7 @@ export function QuickWindow({ options }: { options: QuickLogOptions }) {
             <QuickLog
               options={options}
               compact
+              where="window"
               autoFocus
               onSaved={(r, name) => {
                 const extra = [r.character.leveledUp ? `Level ${r.character.level}!` : null, ...r.questsCompleted.map((q) => `Completed ${q}`)].filter(Boolean);

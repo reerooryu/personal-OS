@@ -1,11 +1,17 @@
+import { ImportReview } from "@/components/imports/import-review";
+import { HealthSettings } from "@/components/settings/health-settings";
 import { CharacterName, DataTools } from "@/components/settings/settings-controls";
+import { UsagePanel } from "@/components/settings/usage-panel";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/views/bits";
 import { DIFFICULTY_LABELS, type Difficulty } from "@/domain/types";
 import { dataDir } from "@/db/client";
 import { appDb } from "@/services/bootstrap";
 import { currentFormula, getProfile } from "@/services/context";
-import { sampleDataCount } from "@/services/views";
+import { guessHealthFolder, importRuleList, importStats, pendingImports } from "@/services/health-import";
+import { getSetting } from "@/services/settings";
+import { usageSummary } from "@/services/usage";
+import { sampleDataCount, skillChoices } from "@/services/views";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +19,8 @@ export default function SettingsPage() {
   const db = appDb();
   const p = getProfile(db);
   const f = currentFormula(db);
+  const skills = skillChoices(db);
+  const pending = pendingImports(db);
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <PageHeader title="Settings" />
@@ -43,15 +51,41 @@ export default function SettingsPage() {
           <Item k="Rest days per week" v={p.restDaysPerWeek} />
         </CardBody>
       </Card>
-      <Card>
-        <CardHeader title="Integrations" />
-        <CardBody className="space-y-1.5 text-sm">
-          {["Google Calendar", "Strava", "Apple Health"].map((n) => (
-            <div key={n} className="flex justify-between">
-              <span>{n}</span>
-              <span className="text-muted">Not connected</span>
+      <Card id="apple-health">
+        <CardHeader title="Apple Health" subtitle="Workouts from the Garmin watch arrive here through Apple Health." />
+        <CardBody className="space-y-5">
+          {pending.length > 0 && (
+            <div className="rounded-xl border border-line bg-surface-2 p-4">
+              <ImportReview items={pending} skills={skills} />
             </div>
-          ))}
+          )}
+          <HealthSettings
+            folder={getSetting(db, "healthFolder")}
+            guess={guessHealthFolder()}
+            lastScan={getSetting(db, "healthLastScan")}
+            stats={importStats(db)}
+            rules={importRuleList(db)}
+            skills={skills}
+          />
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader title="Usage log" />
+        <CardBody>
+          <UsagePanel s={usageSummary(db)} />
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader title="Other integrations" />
+        <CardBody className="space-y-2 text-sm">
+          <div className="flex justify-between gap-4">
+            <span>Google Calendar</span>
+            <span className="text-muted">Milestone 3</span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span>Strava</span>
+            <span className="text-right text-muted">Not used. Strava&apos;s API needs a paid plan and doesn&apos;t allow keeping data, so Garmin workouts come through Apple Health instead.</span>
+          </div>
         </CardBody>
       </Card>
       <p className="text-xs text-faint">Data folder: {dataDir()}</p>

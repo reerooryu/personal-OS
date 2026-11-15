@@ -336,3 +336,10 @@ export function quickLogOptions(db: DB) {
   };
 }
 export type QuickLogOptions = ReturnType<typeof quickLogOptions>;
+
+/** Skills that can be logged, with their attribute name, for skill dropdowns. */
+export function skillChoices(db: DB) {
+  const o = formOptions(db);
+  const attr = new Map(o.attributes.map((a) => [a.id, a.name]));
+  return o.skills.map((s) => ({ id: s.id, name: s.name, attribute: attr.get(s.attributeId) ?? "" }));
+}

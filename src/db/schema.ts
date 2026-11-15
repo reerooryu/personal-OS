@@ -36,6 +36,12 @@ export const profile = sqliteTable("profile", {
   showSampleData: bool("show_sample_data").notNull(),
 });
 
+/** Small app-wide settings (import folder, usage log switch). Key/value so new settings need no migration. */
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: json<unknown>("value").notNull(),
+});
+
 export const formulaVersions = sqliteTable("formula_versions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   params: json<import("@/domain/types").FormulaParams>("params").notNull(),
@@ -404,3 +410,70 @@ export const notices = sqliteTable("notices", {
   createdAt: createdAt(),
   readAt: integer("read_at"),
 });
+
+// --------------------------------------------------------------- IMPORTS ---
+
+/**
+ * What to do with a workout type from Apple Health ("Tennis", "Pool Swim").
+ * Created automatically for obvious types, or when Ryu picks "always" in review.
+ */
+export const importRules = sqliteTable("import_rules", {
+  workoutType: text("workout_type").primaryKey(),
+  action: text("action", { enum: ["log", "ignore"] }).notNull(),
+  skillId: text("skill_id"),
+  activityTypeId: text("activity_type_id"),
+  createdAt: createdAt(),
+});
+
+/**
+ * One workout seen in an export file. Kept even when ignored, so it is never
+ * offered twice. Pending items wait in the review list.
+ */
+export const importItems = sqliteTable(
+  "import_items",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider").notNull(),
+    externalId: text("external_id").notNull(),
+    workoutType: text("workout_type").notNull(),
+    startAt: integer("start_at").notNull(),
+    durationMin: integer("duration_min").notNull(),
+    details: json<WorkoutDetails>("details").notNull(),
+    status: text("status", { enum: ["pending", "imported", "matched", "ignored"] }).notNull(),
+    activityId: text("activity_id"),
+    fileName: text("file_name"),
+    createdAt: createdAt(),
+    decidedAt: integer("decided_at"),
+  },
+  (t) => [uniqueIndex("import_items_uq").on(t.provider, t.externalId), index("import_items_status_idx").on(t.status)],
+);
+
+export interface WorkoutDetails {
+  distanceKm?: number;
+  kcal?: number;
+  avgHr?: number;
+  maxHr?: number;
+  location?: string;
+  sourceName?: string;
+}
+
+// ----------------------------------------------------------------- USAGE ---
+
+/**
+ * The usage log: what was opened and clicked, how long logging took, forms
+ * given up on, errors. Never what was typed. Not part of exports or the engine.
+ */
+export const usageEvents = sqliteTable(
+  "usage_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    at: integer("at").notNull(),
+    sessionId: text("session_id").notNull(),
+    kind: text("kind").notNull(),
+    name: text("name").notNull(),
+    path: text("path"),
+    ms: integer("ms"),
+    meta: json<Record<string, string | number | boolean>>("meta"),
+  },
+  (t) => [index("usage_events_at_idx").on(t.at)],
+);

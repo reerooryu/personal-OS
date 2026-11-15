@@ -13,6 +13,9 @@ Every record is either a **source** (entered by the user) or **derived** (comput
 | Achievement definitions | Achievement unlocks |
 | Manual and user-edited journal entries | Automatic journal entries |
 | Settings and formula versions | Levels, grades and traits (computed on read) |
+| Import items and import rules | Activities created from imports (ordinary activities with `source = "import"`) |
+
+The usage log (`usage_events`) is neither: it is not exported, not read by the engine, and can be cleared at any time.
 
 ## Layers
 
@@ -81,6 +84,10 @@ All timestamps are UTC milliseconds. `src/domain/time.ts` is the only place that
 The menu-bar icon talks to `/api/tray`. The global shortcut opens a small window on `/quick`. `better-sqlite3` uses Node-API prebuilt binaries, so the same binary works in Node and in Electron with no rebuild.
 
 `npm run package` (`scripts/package-app.mjs`) builds the standalone server, copies it with its static files, migrations and the optional starting record into `dist-app/`, runs electron-builder (the app archive holds only `electron/`), copies `dist-app/` into the app's Resources in an `afterPack` hook, and ad-hoc signs the app for this Mac.
+
+## Imports (`src/services/health-import.ts`)
+
+Every workout read from an Apple Health export becomes an `import_items` row, keyed by workout type and start minute (not the HealthKit id, which Garmin Connect rewrites). A rule per workout type says "log as skill X" or "ignore". Obvious types get a rule on first sight. Others stay `pending` for review. Logging checks for a hand-logged activity covering at least half the same time on the same skill and marks the item `matched` instead. Imported activities carry `externalId`, so reading a file again never duplicates them, and a deleted one stays deleted.
 
 ## Data location
 

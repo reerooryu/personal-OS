@@ -5,7 +5,7 @@
  * window, and adds a menu-bar icon (timer, one-click logging) and a global
  * quick-log shortcut. All data lives in ~/Library/Application Support/ASCEND.
  */
-const { app, BrowserWindow, Menu, Notification, Tray, dialog, globalShortcut, ipcMain, nativeImage, screen, shell, utilityProcess } = require("electron");
+const { app, BrowserWindow, Menu, Notification, Tray, dialog, globalShortcut, ipcMain, nativeImage, powerMonitor, screen, shell, utilityProcess } = require("electron");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -186,11 +186,15 @@ function toggleQuick() {
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const { x, y, width } = display.workArea;
   quickWindow.setPosition(Math.round(x + (width - 640) / 2), Math.round(y + 160));
-  quickWindow.loadURL(`${baseUrl}/quick`);
-  quickWindow.once("ready-to-show", () => {
-    quickWindow.show();
-    quickWindow.focus();
-  });
+  // Reload each time so the dropdowns are fresh. ready-to-show only fires once per
+  // window, so wait for the load itself instead.
+  quickWindow
+    .loadURL(`${baseUrl}/quick`)
+    .then(() => {
+      quickWindow.show();
+      quickWindow.focus();
+    })
+    .catch(() => quickWindow.show());
 }
 
 ipcMain.on("quick:hide", () => {
@@ -313,6 +317,40 @@ function createTray() {
   refreshTray();
 }
 
+// ------------------------------------------------------------ Apple Health ---
+
+ipcMain.handle("dialog:folder", async (_e, defaultPath) => {
+  const icloud = path.join(app.getPath("home"), "Library", "Mobile Documents", "com~apple~CloudDocs");
+  const r = await dialog.showOpenDialog(mainWindow, {
+    title: "Choose the Health Auto Export folder",
+    defaultPath: typeof defaultPath === "string" && defaultPath ? defaultPath : icloud,
+    properties: ["openDirectory"],
+  });
+  return r.canceled ? null : r.filePaths[0] ?? null;
+});
+
+const HEALTH_SCAN_MS = 15 * 60_000;
+let scanning = false;
+
+/** Asks the server to check the export folder. Quiet unless something new arrived. */
+async function scanHealth() {
+  if (!baseUrl || scanning) return;
+  scanning = true;
+  try {
+    const r = await fetch(`${baseUrl}/api/health/scan`, { method: "POST" }).then((res) => res.json());
+    if (r.added > 0) {
+      if (r.notice && Notification.isSupported()) new Notification({ title: "ASCEND", body: r.notice, silent: true }).show();
+      // Don't reload under Ryu's hands: only refresh a window he isn't using.
+      if (mainWindow && !mainWindow.isFocused()) refreshMain();
+      refreshTray();
+    }
+  } catch {
+    /* the server may be restarting; try again next time */
+  } finally {
+    scanning = false;
+  }
+}
+
 // --------------------------------------------------------------- lifecycle ---
 
 app.setName("ASCEND");
@@ -331,6 +369,9 @@ app.whenReady().then(async () => {
   if (!globalShortcut.register(SHORTCUT, toggleQuick)) {
     console.warn(`Could not register ${SHORTCUT}; another app may be using it.`);
   }
+  setTimeout(scanHealth, 10_000);
+  setInterval(scanHealth, HEALTH_SCAN_MS);
+  powerMonitor.on("resume", () => setTimeout(scanHealth, 30_000));
 });
 
 app.on("activate", showMain);

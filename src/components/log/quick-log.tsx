@@ -12,6 +12,7 @@ import { useReward } from "@/components/reward/reward-provider";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { DIFFICULTIES, DIFFICULTY_LABELS, type Difficulty } from "@/domain/types";
+import { track } from "@/lib/usage-client";
 import { cn, minutesLabel, newRequestId } from "@/lib/utils";
 import type { RewardSummary } from "@/services/rewards";
 import type { QuickLogOptions } from "@/services/views";
@@ -48,6 +49,7 @@ function resolve(options: QuickLogOptions, key: string): Choice | null {
 
 export function QuickLog({
   options,
+  where,
   compact,
   autoFocus,
   onDone,
@@ -55,6 +57,8 @@ export function QuickLog({
   onError,
 }: {
   options: QuickLogOptions;
+  /** Where this logger sits, for the usage log. */
+  where: "overview" | "activities" | "dialog" | "window";
   /** One row without the "when" picker, for the shortcut window. */
   compact?: boolean;
   autoFocus?: boolean;
@@ -76,6 +80,16 @@ export function QuickLog({
   const reward = useReward();
   const router = useRouter();
   const choice = resolve(options, key);
+  // Usage log: time from opening (dialog, window) or first touch (inline bars) to saving.
+  const startedAt = React.useRef<number | null>(null);
+  const changed = React.useRef(new Set<string>());
+  React.useEffect(() => {
+    if (autoFocus) startedAt.current = Date.now();
+  }, [autoFocus]);
+  const touch = (field?: string) => {
+    if (startedAt.current === null) startedAt.current = Date.now();
+    if (field) changed.current.add(field);
+  };
 
   React.useEffect(() => {
     if (!choice) return;
@@ -91,6 +105,7 @@ export function QuickLog({
   }, [choice?.activityTypeId, minutes, difficulty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function pick(next: string) {
+    touch("what");
     setKey(next);
     setDup(null);
     const c = resolve(options, next);
@@ -118,10 +133,19 @@ export function QuickLog({
     );
     setBusy(false);
     if (!r.ok) {
-      if ("code" in r && r.code === "duplicate") return setDup(r.error);
+      if ("code" in r && r.code === "duplicate") {
+        track("warning", "duplicate", { meta: { where } });
+        return setDup(r.error);
+      }
       if (onError) return onError(r.error);
       return reward.error(r.error);
     }
+    track("save", "quick-log", {
+      ms: Date.now() - (startedAt.current ?? Date.now()),
+      meta: { where, pick: key.startsWith("tpl:") ? "activity" : "skill", changed: [...changed.current].join(" ") || "none", minutes, confirmedDuplicate: confirmDuplicate },
+    });
+    startedAt.current = autoFocus ? Date.now() : null;
+    changed.current.clear();
     requestId.current = newRequestId();
     setDup(null);
     if (onSaved) onSaved(r.reward, r.name ?? choice.name);
@@ -143,6 +167,8 @@ export function QuickLog({
 
   return (
     <form
+      data-track={`quick-log (${where})`}
+      onFocus={() => touch()}
       onSubmit={(e) => {
         e.preventDefault();
         void save();
@@ -165,14 +191,20 @@ export function QuickLog({
             ))}
           </optgroup>
         </Select>
-        <Select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} aria-label="How long">
+        <Select value={minutes} onChange={(e) => {
+            touch("length");
+            setMinutes(Number(e.target.value));
+          }} aria-label="How long">
           {minuteOptions.map((m) => (
             <option key={m} value={m}>
               {minutesLabel(m)}
             </option>
           ))}
         </Select>
-        <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} aria-label="How hard">
+        <Select value={difficulty} onChange={(e) => {
+            touch("difficulty");
+            setDifficulty(e.target.value as Difficulty);
+          }} aria-label="How hard">
           {DIFFICULTIES.map((d) => (
             <option key={d} value={d}>
               {DIFFICULTY_LABELS[d]}
@@ -180,7 +212,10 @@ export function QuickLog({
           ))}
         </Select>
         {!compact && (
-          <Select value={ago} onChange={(e) => setAgo(Number(e.target.value))} aria-label="When">
+          <Select value={ago} onChange={(e) => {
+              touch("when");
+              setAgo(Number(e.target.value));
+            }} aria-label="When">
             {WHEN.map((w) => (
               <option key={w.value} value={w.value}>
                 {w.label}

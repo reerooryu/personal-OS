@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { logTemplateAction, startTimerAction } from "@/app/actions";
 import { useReward } from "@/components/reward/reward-provider";
+import { track } from "@/lib/usage-client";
 import { cn, newRequestId } from "@/lib/utils";
 
 export interface TileData {
@@ -25,6 +26,7 @@ export function Tiles({ tiles, timerRunning, suggested }: { tiles: TileData[]; t
     const r = await logTemplateAction(t.id, newRequestId());
     setPending(null);
     if (!r.ok) return reward.error(r.error);
+    track("save", "tile", { ms: 0, meta: { template: t.id } });
     reward.reward(r.reward, { title: r.name, activityId: r.activityId });
     router.refresh();
   }
@@ -44,7 +46,7 @@ export function Tiles({ tiles, timerRunning, suggested }: { tiles: TileData[]; t
       )}
     >
       <span className="absolute inset-y-0 left-0 w-1" style={{ background: t.color }} />
-      <button onClick={() => log(t)} disabled={!!pending} className={cn("flex-1 pl-4 pr-2 text-left", small ? "py-2" : "py-3")}>
+      <button onClick={() => log(t)} disabled={!!pending} data-track={`tile ${t.id}`} className={cn("flex-1 pl-4 pr-2 text-left", small ? "py-2" : "py-3")}>
         <p className="text-sm font-medium leading-tight">{t.name}</p>
         <p className="mt-0.5 text-xs text-muted">{t.durationMin} min</p>
       </button>

@@ -19,6 +19,7 @@ export const EXPORT_VERSION = 1;
 /** Source tables, in an order that satisfies foreign keys on import. */
 const SOURCE_TABLES = {
   profile: t.profile,
+  appSettings: t.appSettings,
   formulaVersions: t.formulaVersions,
   attributes: t.attributes,
   skills: t.skills,
@@ -41,6 +42,8 @@ const SOURCE_TABLES = {
   achievements: t.achievements,
   journalEntries: t.journalEntries,
   activeTimer: t.activeTimer,
+  importRules: t.importRules,
+  importItems: t.importItems,
 } satisfies Record<string, SQLiteTable>;
 
 type TableName = keyof typeof SOURCE_TABLES;

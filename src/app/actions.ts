@@ -24,6 +24,17 @@ import { appDb } from "@/services/bootstrap";
 import { getOpenedDb, dataDir } from "@/db/client";
 import { backupTo } from "@/services/data";
 import { verify } from "@/services/engine";
+import {
+  decideImport,
+  deleteImportRule,
+  importHealthJson,
+  returnToReview,
+  scanHealthFolder,
+  setImportRule,
+  type ImportDecision,
+} from "@/services/health-import";
+import { setSetting } from "@/services/settings";
+import { clearUsage } from "@/services/usage";
 import { ValidationError, type Issue } from "@/services/errors";
 import {
   awardMedal,
@@ -325,6 +336,109 @@ export async function backupNowAction(): Promise<Result<{ file: string }>> {
   try {
     appDb();
     return { ok: true, file: backupTo(getOpenedDb(), path.join(dataDir(), "backups")) };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ------------------------------------------------------------- usage log ---
+
+export async function setUsageLogAction(enabled: boolean): Promise<Result> {
+  setSetting(appDb(), "usageLog", enabled);
+  done();
+  return { ok: true };
+}
+
+export async function clearUsageAction(): Promise<Result> {
+  clearUsage(appDb());
+  done();
+  return { ok: true };
+}
+
+// ---------------------------------------------------------- Apple Health ---
+
+type ScanResult = Result<{ added: number; message: string }>;
+
+function scanMessage(r: ReturnType<typeof scanHealthFolder>): ScanResult {
+  if ("skipped" in r) return { ok: false, error: r.skipped ?? "Choose a folder first" };
+  if (r.error && !r.added) return { ok: false, error: r.error };
+  const msg = r.added ? `Found ${r.added} new workout${r.added === 1 ? "" : "s"}.` : "No new workouts.";
+  return { ok: true, added: r.added, message: r.error ? `${msg} One file couldn't be read: ${r.error}` : msg };
+}
+
+export async function setHealthFolderAction(folder: string | null): Promise<ScanResult> {
+  try {
+    const db = appDb();
+    setSetting(db, "healthFolder", folder?.trim() || null);
+    setSetting(db, "healthFiles", {});
+    if (!folder?.trim()) {
+      done();
+      return { ok: true, added: 0, message: "Folder removed." };
+    }
+    const r = scanMessage(scanHealthFolder(db));
+    done();
+    return r;
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function scanHealthAction(): Promise<ScanResult> {
+  try {
+    const r = scanMessage(scanHealthFolder(appDb()));
+    done();
+    return r;
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function uploadHealthFileAction(form: FormData): Promise<ScanResult> {
+  try {
+    const f = form.get("file");
+    if (!(f instanceof File)) return { ok: false, error: "Choose a file" };
+    if (f.size > 50 * 1024 * 1024) return { ok: false, error: "That file is over 50 MB. Export a shorter date range." };
+    const r = importHealthJson(appDb(), await f.text(), f.name);
+    done();
+    if (!r.found) return { ok: false, error: "No workouts in that file. Export workouts as JSON from Health Auto Export." };
+    return { ok: true, added: r.added, message: r.added ? `Found ${r.added} new workout${r.added === 1 ? "" : "s"}.` : "Those workouts were already imported." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function decideImportAction(d: ImportDecision): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { reward } = withReward(db, () => decideImport(db, d), () => db.select().from(t.importItems).where(eq(t.importItems.id, d.itemId)).get()?.activityId ?? null);
+    done();
+    return { ok: true, reward };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setImportRuleAction(workoutType: string, rule: { action: "log" | "ignore"; skillId?: string | null }): Promise<Result> {
+  try {
+    setImportRule(appDb(), workoutType, rule);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteImportRuleAction(workoutType: string): Promise<Result> {
+  deleteImportRule(appDb(), workoutType);
+  done();
+  return { ok: true };
+}
+
+export async function returnToReviewAction(itemId: string): Promise<Result> {
+  try {
+    returnToReview(appDb(), itemId);
+    done();
+    return { ok: true };
   } catch (e) {
     return fail(e);
   }

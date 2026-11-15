@@ -1,5 +1,6 @@
 import { Flame, Trophy } from "lucide-react";
 import Link from "next/link";
+import { ImportReview } from "@/components/imports/import-review";
 import { QuickLog } from "@/components/log/quick-log";
 import { Tiles, type TileData } from "@/components/log/tiles";
 import { TimerBar } from "@/components/log/timer-bar";
@@ -11,9 +12,10 @@ import { dayKey, localParts } from "@/domain/time";
 import { requestTime } from "@/lib/clock";
 import { dateLabel, fmt, minutesLabel } from "@/lib/utils";
 import { appDb } from "@/services/bootstrap";
+import { pendingImports } from "@/services/health-import";
 import { loadSkillTree } from "@/services/context";
 import { achievementList, attributeSummaries, characterSummary, medalCase, questBoard, unreadNotices } from "@/services/queries";
-import { activityHistory, sampleDataCount, suggestedNow, tiles, timerView, today, weekInReview, quickLogOptions } from "@/services/views";
+import { activityHistory, sampleDataCount, suggestedNow, tiles, timerView, today, weekInReview, quickLogOptions, skillChoices } from "@/services/views";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,7 @@ export default function Overview() {
   const isMonday = new Date(dayKey(now, { timezone: "Asia/Bangkok", dayBoundaryMinutes: 240 })).getUTCDay() === 1;
   const review = isMonday ? weekInReview(db, now) : null;
   const samples = sampleDataCount(db);
+  const pending = pendingImports(db);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -63,6 +66,13 @@ export default function Overview() {
       </div>
 
       <Notices items={unreadNotices(db)} />
+      {pending.length > 0 && (
+        <Card className="mb-4">
+          <CardBody className="pt-5">
+            <ImportReview items={pending} skills={skillChoices(db)} compact />
+          </CardBody>
+        </Card>
+      )}
       {samples > 0 && (
         <div className="mb-4 rounded-xl border border-warn/20 bg-warn/[0.06] px-4 py-2.5 text-sm text-warn">
           Showing {samples} sample activities so the app isn&apos;t empty. They&apos;re marked &quot;Sample&quot;.{" "}
@@ -76,7 +86,7 @@ export default function Overview() {
       <Card className="mb-5">
         <CardBody className="space-y-4 pt-5">
           {timer && <TimerBar name={timer.name} startedAt={timer.startedAt} />}
-          <QuickLog options={quickLogOptions(db)} />
+          <QuickLog options={quickLogOptions(db)} where="overview" />
           <Tiles tiles={tileList} suggested={suggested} timerRunning={!!timer} />
         </CardBody>
       </Card>

@@ -30,7 +30,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: P
       />
       <Card className="mb-5">
         <CardBody className="pt-5">
-          <QuickLog options={quickLogOptions(db)} />
+          <QuickLog options={quickLogOptions(db)} where="activities" />
         </CardBody>
       </Card>
       <form className="mb-4 flex items-center gap-2 text-sm">

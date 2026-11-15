@@ -2,7 +2,7 @@
 
 A private, RPG-style personal development app. Log an activity once, and the whole system responds: XP, levels, quests, medals, achievements, the journal and analytics.
 
-**Status: Milestone 2 of 4 (core screens and Mac app).** Overview, Statistics, Quests, Calendar, Activities, Honors and Settings work, and ASCEND runs as a Mac app with a menu-bar quick log. Tasks, Journal and Analytics screens arrive in Milestone 3.
+**Status: Milestone 2 of 4 (core screens and Mac app).** Overview, Statistics, Quests, Calendar, Homework, Activities, Honors and Settings work, and ASCEND runs as a Mac app with a menu-bar quick log. Journal and Analytics screens arrive in Milestone 3.
 
 ## Requirements
 
@@ -34,6 +34,15 @@ The Calendar page shows the school timetable (Week 1 and Week 2), tutoring, one-
 - **Holidays:** "School only" closures pause lessons and duties. "Everything" pauses tutoring too (Christmas). Both are set per break in Settings.
 - **Week 1 / Week 2** alternate every calendar week from the anchor in the file. A Sunday counts as part of the week after it. If the school's rotation ever disagrees (after a holiday, say), use **Swap Week 1 and 2** in Settings.
 - **iPhone:** the timetable, tutoring and one-off events are written into a calendar called **ASCEND** in iCloud, eight weeks ahead, so they appear in Apple Calendar on the iPhone next to the SOCS events. The first sync asks for Calendar access. This needs the Swift compiler on the Mac when packaging (`xcode-select --install` if `npm run package` says it skipped the calendar helper). Because the app isn't signed with a developer certificate, macOS may ask for Calendar access again after a rebuild.
+
+## Homework and tests
+
+- **Add homework:** title, subject, due, optional description. Picking the subject preselects its next lesson as the due time, and the list offers the next eight lessons. "Pick a date and time" covers anything else, such as 16:00.
+- **Homework page:** this week, Monday to Sunday, with each day's homework and tests. Overdue homework turns red and stays until it's done.
+- **Ticking off** asks how long it took. Picking a time logs it as study in that subject, which earns XP. "Just tick" logs nothing. Unticking offers to remove the logged time.
+- **Time Management** (the trait) is now the share of homework from the last 28 days that was done by its due time. It needs at least three pieces of homework.
+- **Tests** (quiz, test, mock, exam) use the same date picker. They replace the lesson on the calendar and on the iPhone, count down on the Overview, and afterwards ask for the result ("38 out of 40"), which is saved as that subject's test percentage in Statistics.
+- Homework and tests can also be listed in `private/timetable.json` (see the example). Each is added once. After that it belongs to the app.
 
 ## Garmin workouts (Apple Health)
 
@@ -103,12 +112,13 @@ See [ARCHITECTURE.md](ARCHITECTURE.md). In short: activities, assessments and ot
 
 ## Added after Milestone 2
 
+- Homework checklist and tests, with results recorded as assessments and Time Management computed from homework
 - Calendar: two-week timetable, tutoring, holidays, SOCS clubs, "Did you go?" logging, and sync to Apple Calendar on the iPhone
 
 - Dropdown logger replaces typed entry everywhere (Overview, Activities, the L dialog, the ⌥⇧L window)
 - Apple Health workout import for the Garmin watch, with a review list and per-type rules
 - Usage log with a friction summary and CSV/JSON export
-- 117 tests
+- 124 tests
 
 ## Implemented in Milestone 1
 
@@ -128,6 +138,6 @@ See [ARCHITECTURE.md](ARCHITECTURE.md). In short: activities, assessments and ot
 
 - The Mac app isn't signed with an Apple developer certificate. Built on your own Mac it opens normally; if macOS ever blocks it, right-click it and choose Open.
 - Progression settings, activity templates and measurement types are shown but not yet editable in the app.
-- Tasks, journal and analytics screens come in Milestone 3. The calendar has no in-app editor yet: the timetable is edited in its file. The Time Management trait needs tasks, so it shows "Not enough data" until then.
+- Journal and analytics screens come in Milestone 3. The calendar has no in-app editor yet: the timetable is edited in its file. Time Management shows "Not enough data" until three pieces of homework have come due.
 - Deterministic quest generation templates are not yet exposed in the UI. Two supporting quests are seeded by hand.
-- Integrations: Apple Health (workouts in), SOCS (school calendar in), Apple Calendar (timetable out). Tasks and the journal arrive with Milestone 3.
+- Integrations: Apple Health (workouts in), SOCS (school calendar in), Apple Calendar (timetable out). The journal arrives with Milestone 3.

@@ -34,6 +34,20 @@ import {
   setImportRule,
   type ImportDecision,
 } from "@/services/health-import";
+import {
+  addHomework,
+  addTest,
+  completeHomework,
+  deleteHomework,
+  deleteTest,
+  recordTestResult,
+  reopenHomework,
+  setNoResult,
+  updateHomework,
+  updateTest,
+  type HomeworkInput,
+  type TestInput,
+} from "@/services/schoolwork";
 import { setSetting } from "@/services/settings";
 import { clearUsage } from "@/services/usage";
 import { ValidationError, type Issue } from "@/services/errors";
@@ -504,4 +518,80 @@ export async function setCalendarRuleAction(titleKey: string, rule: { action: "l
   } catch (e) {
     return fail(e);
   }
+}
+
+// ---------------------------------------------------------- homework, tests ---
+
+export async function saveHomeworkAction(id: string | null, input: HomeworkInput): Promise<Result> {
+  try {
+    const db = appDb();
+    if (id) updateHomework(db, id, input);
+    else addHomework(db, input);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteHomeworkAction(id: string): Promise<Result> {
+  deleteHomework(appDb(), id);
+  done();
+  return { ok: true };
+}
+
+export async function completeHomeworkAction(id: string, minutes: number | null): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { result, reward } = withReward(db, () => completeHomework(db, id, minutes), (r) => r.activityId);
+    done();
+    return { ok: true, reward, activityId: result.activityId ?? undefined };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function reopenHomeworkAction(id: string, removeActivity: boolean): Promise<Result> {
+  try {
+    reopenHomework(appDb(), id, removeActivity);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function saveTestAction(id: string | null, input: TestInput): Promise<Result> {
+  try {
+    const db = appDb();
+    if (id) updateTest(db, id, input);
+    else addTest(db, input);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteTestAction(id: string): Promise<Result> {
+  deleteTest(appDb(), id);
+  done();
+  return { ok: true };
+}
+
+export async function recordTestResultAction(id: string, score: number, outOf: number): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { reward } = withReward(db, () => recordTestResult(db, id, score, outOf));
+    done();
+    return { ok: true, reward };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function noTestResultAction(id: string): Promise<Result> {
+  setNoResult(appDb(), id);
+  done();
+  return { ok: true };
 }

@@ -21,11 +21,11 @@ import { getSetting, setSetting } from "./settings";
 const DAY = 86_400_000;
 const INBOX_DAYS = 7;
 
-export type OccurrenceKind = "lesson" | "tutoring" | "duty" | "event" | "school";
+export type OccurrenceKind = "lesson" | "tutoring" | "duty" | "event" | "school" | "test";
 
 export interface Occurrence {
   key: string;
-  source: "timetable" | "event" | "feed";
+  source: "timetable" | "event" | "feed" | "test";
   kind: OccurrenceKind;
   title: string;
   location: string | null;
@@ -231,7 +231,33 @@ export function occurrences(db: DB, fromDate: string, toDate: string): Occurrenc
       ...status(key),
     });
   }
-  return out.sort((a, b) => a.startAt - b.startAt || a.endAt - b.endAt);
+  // Tests: shown in place of the lesson they fall in.
+  const tests = db.select().from(t.tests).all().filter((x) => x.startAt < to && x.startAt + x.durationMin * 60_000 > from);
+  for (const x of tests) {
+    const key = `test:${x.id}`;
+    out.push({
+      key,
+      source: "test",
+      kind: "test",
+      title: x.title,
+      location: null,
+      startAt: x.startAt,
+      endAt: x.startAt + x.durationMin * 60_000,
+      allDay: false,
+      week: anchor ? rotationWeek(localDate(x.startAt, zone), anchor) : null,
+      skillId: x.skillId,
+      xp: "none",
+      activityTypeId: "exam",
+      cancelled: false,
+      needsSkill: false,
+      status: null,
+      activityId: null,
+    });
+  }
+  const replaced = (o: Occurrence) =>
+    o.kind === "lesson" && tests.some((x) => x.skillId === o.skillId && x.startAt < o.endAt && x.startAt + x.durationMin * 60_000 > o.startAt);
+  for (const o of out) if (o.kind === "test") o.location = out.find((l) => l.kind === "lesson" && l.skillId === o.skillId && l.startAt <= o.startAt && o.startAt < l.endAt)?.location ?? null;
+  return out.filter((o) => !replaced(o)).sort((a, b) => a.startAt - b.startAt || a.endAt - b.endAt);
 }
 
 function ymd(key: string): [number, number, number] {
@@ -244,12 +270,19 @@ export function calendarWeek(db: DB, anyDate: string) {
   const monday = addDays(anyDate, 1 - weekdayOf(anyDate));
   const sunday = addDays(monday, 6);
   const bs = breaks(db);
+  const zone = tz(db);
+  const dueByDay = new Map<string, number>();
+  for (const h of db.select().from(t.homework).all()) {
+    if (h.completedAt) continue;
+    const d = localDate(h.dueAt, zone);
+    dueByDay.set(d, (dueByDay.get(d) ?? 0) + 1);
+  }
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(monday, i);
     // A Sunday belongs to the rotation week after it.
     const anchor = weekAnchor(db);
     const rot = anchor && weekdayOf(date) === 7 ? rotationWeek(date, anchor) : null;
-    return { date, break: breakOn(date, bs)?.name ?? null, week: rot };
+    return { date, break: breakOn(date, bs)?.name ?? null, week: rot, due: dueByDay.get(date) ?? 0 };
   });
   return { monday, days, week: currentWeek(db, monday), items: occurrences(db, monday, sunday) };
 }
@@ -395,7 +428,7 @@ export interface OutboxItem {
   end: number;
 }
 
-const KIND_LABEL: Record<OccurrenceKind, string> = { lesson: "Lesson", tutoring: "Tutoring", duty: "School duty", event: "Event", school: "School" };
+const KIND_LABEL: Record<OccurrenceKind, string> = { lesson: "Lesson", tutoring: "Tutoring", duty: "School duty", event: "Event", school: "School", test: "Test" };
 
 /**
  * What ASCEND puts in the "ASCEND" calendar in Apple Calendar: the timetable,

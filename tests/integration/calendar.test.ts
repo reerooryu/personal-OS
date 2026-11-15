@@ -268,8 +268,8 @@ describe("feed and Apple Calendar", () => {
     const w = calendarWeek(db, "2026-12-09");
     expect(w.monday).toBe("2026-12-07");
     expect(w.week).toBe(2);
-    expect(w.days[0]).toEqual({ date: "2026-12-07", break: "School closed", week: null });
-    expect(w.days[6]).toEqual({ date: "2026-12-13", break: null, week: 1 }); // the Sunday before a Week 1
+    expect(w.days[0]).toEqual({ date: "2026-12-07", break: "School closed", week: null, due: 0 });
+    expect(w.days[6]).toEqual({ date: "2026-12-13", break: null, week: 1, due: 0 }); // the Sunday before a Week 1
     expect(w.items.map((i) => i.title)).toContain("Biology");
     expect(w.items.map((i) => i.title)).not.toContain("Economics"); // closed that Monday
   });

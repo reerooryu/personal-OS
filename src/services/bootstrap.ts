@@ -8,7 +8,10 @@ import path from "node:path";
 import { dataDir, getOpenedDb, type DB } from "@/db/client";
 import { seedDatabase } from "@/seed/seed";
 import { loadStartingRecord } from "@/seed/starting-record";
+import { localToUtc } from "@/domain/time";
 import { syncTimetableFile } from "./calendar";
+import { getProfile } from "./context";
+import { importSchoolworkFromFile } from "./schoolwork";
 import { backupTo } from "./data";
 import { isSeeded } from "./queries";
 
@@ -52,8 +55,20 @@ export function appDb(): DB {
 function loadTimetable(db: DB, file: string | undefined) {
   if (!file || !fs.existsSync(/* turbopackIgnore: true */ file)) return;
   try {
-    const r = syncTimetableFile(db, fs.readFileSync(/* turbopackIgnore: true */ file, "utf8"));
-    if (r) console.log(`Timetable imported: ${r.slots} slots, ${r.events} events, ${r.breaks} breaks`);
+    const text = fs.readFileSync(/* turbopackIgnore: true */ file, "utf8");
+    const r = syncTimetableFile(db, text);
+    if (r) {
+      console.log(`Timetable imported: ${r.slots} slots, ${r.events} events, ${r.breaks} breaks`);
+      // Homework and tests listed in the file are added once; after that they belong to the app.
+      const zone = getProfile(db).timezone;
+      const toUtc = (local: string) => {
+        const m = local.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/);
+        if (!m) throw new Error(`Bad date "${local}". Use YYYY-MM-DD HH:MM.`);
+        return localToUtc(zone, +m[1]!, +m[2]!, +m[3]!, +m[4]!, +m[5]!);
+      };
+      const added = importSchoolworkFromFile(db, JSON.parse(text), toUtc);
+      if (added) console.log(`Added ${added} homework and tests from the timetable file`);
+    }
   } catch (e) {
     console.error("Timetable import failed", e);
   }

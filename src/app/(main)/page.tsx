@@ -1,6 +1,7 @@
 import { Flame, Trophy } from "lucide-react";
 import Link from "next/link";
 import { DidYouGo } from "@/components/calendar/did-you-go";
+import { DueSoon } from "@/components/schoolwork/due-soon";
 import { ImportReview } from "@/components/imports/import-review";
 import { QuickLog } from "@/components/log/quick-log";
 import { Tiles, type TileData } from "@/components/log/tiles";
@@ -14,6 +15,7 @@ import { requestTime } from "@/lib/clock";
 import { dateLabel, fmt, minutesLabel } from "@/lib/utils";
 import { appDb } from "@/services/bootstrap";
 import { pendingImports } from "@/services/health-import";
+import { dueSoon, lessonChoices } from "@/services/schoolwork";
 import { loadSkillTree } from "@/services/context";
 import { achievementList, attributeSummaries, characterSummary, medalCase, questBoard, unreadNotices } from "@/services/queries";
 import { activityHistory, sampleDataCount, suggestedNow, tiles, timerView, today, weekInReview, quickLogOptions, skillChoices, calendarInboxItems } from "@/services/views";
@@ -75,6 +77,7 @@ export default function Overview() {
           </CardBody>
         </Card>
       )}
+      <DueSoon data={dueSoon(db, requestTime())} now={requestTime()} skills={skillChoices(db)} lessons={lessonChoices(db, requestTime())} />
       {pending.length > 0 && (
         <Card className="mb-4">
           <CardBody className="pt-5">

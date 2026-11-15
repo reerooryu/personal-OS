@@ -49,6 +49,8 @@ const SOURCE_TABLES = {
   schoolBreaks: t.schoolBreaks,
   calendarRules: t.calendarRules,
   calendarConfirmations: t.calendarConfirmations,
+  homework: t.homework,
+  tests: t.tests,
 } satisfies Record<string, SQLiteTable>;
 
 type TableName = keyof typeof SOURCE_TABLES;

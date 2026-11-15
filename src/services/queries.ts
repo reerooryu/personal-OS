@@ -4,7 +4,8 @@ import type { DB } from "@/db/client";
 import * as t from "@/db/schema";
 import { gradeFor, gradeProgress, proficiency, STALE_AFTER_MS } from "@/domain/proficiency";
 import { addDays, dayKey, periodKey as periodKeyOf } from "@/domain/time";
-import { consistencyScore, disciplineScore, streaks, TRAIT_WINDOW_DAYS } from "@/domain/traits";
+import { consistencyScore, disciplineScore, streaks, timeManagementScore, TRAIT_WINDOW_DAYS } from "@/domain/traits";
+import { homeworkTimeliness } from "./schoolwork";
 import type { MedalTier } from "@/domain/types";
 import { levelFromXp, type LevelInfo } from "@/domain/xp";
 import { currentFormula, getProfile, loadSkillTree, timeSettings } from "./context";
@@ -163,7 +164,7 @@ export function traitScores(db: DB, now = Date.now()): Record<"consistency" | "d
   return {
     consistency: consistencyScore(byDay, today, profile.restDaysPerWeek),
     discipline: disciplineScore(instances),
-    time_management: null, // Tasks arrive with the calendar in milestone 3.
+    time_management: timeManagementScore(homeworkTimeliness(db, now)),
   };
 }
 

@@ -553,3 +553,41 @@ export const externalEvents = sqliteTable(
   },
   (t) => [index("external_events_start_idx").on(t.startAt)],
 );
+
+// -------------------------------------------------------- HOMEWORK, TESTS ---
+
+/** Homework. Done on or before the due time counts toward Time Management. */
+export const homework = sqliteTable(
+  "homework",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    skillId: text("skill_id").notNull(),
+    dueAt: integer("due_at").notNull(),
+    description: text("description"),
+    createdAt: createdAt(),
+    completedAt: integer("completed_at"),
+    /** The study session logged when it was ticked off, if any. */
+    activityId: text("activity_id"),
+  },
+  (t) => [index("homework_due_idx").on(t.dueAt)],
+);
+
+/** Tests and exams. The result, once entered, is an assessment. */
+export const tests = sqliteTable(
+  "tests",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    kind: text("kind", { enum: ["quiz", "test", "mock", "exam"] }).notNull(),
+    skillId: text("skill_id").notNull(),
+    startAt: integer("start_at").notNull(),
+    durationMin: integer("duration_min").notNull(),
+    notes: text("notes"),
+    createdAt: createdAt(),
+    assessmentId: text("assessment_id"),
+    /** Set when Ryu says there will be no result to enter. */
+    noResult: bool("no_result").notNull().default(false),
+  },
+  (t) => [index("tests_start_idx").on(t.startAt)],
+);

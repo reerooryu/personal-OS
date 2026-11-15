@@ -17,6 +17,7 @@ const STYLE: Record<Occurrence["kind"], string> = {
   school: "border-good/40 bg-good/15 text-ink",
   duty: "border-warn/40 bg-warn/15 text-ink",
   event: "border-warn/50 bg-warn/20 text-ink",
+  test: "border-bad/50 bg-bad/20 text-ink font-medium",
 };
 
 export const KIND_NAMES: Record<Occurrence["kind"], string> = {
@@ -25,6 +26,7 @@ export const KIND_NAMES: Record<Occurrence["kind"], string> = {
   school: "School club (SOCS)",
   duty: "Duty",
   event: "Event",
+  test: "Test",
 };
 
 function minutesOfDay(ms: number): number {
@@ -59,7 +61,7 @@ function lanes(items: Occurrence[]) {
   return out;
 }
 
-export function WeekGrid({ days, items, today }: { days: { date: string; break: string | null; week: 1 | 2 | null }[]; items: Occurrence[]; today: string }) {
+export function WeekGrid({ days, items, today }: { days: { date: string; break: string | null; week: 1 | 2 | null; due: number }[]; items: Occurrence[]; today: string }) {
   const height = (END_H - START_H) * 60 * PX_PER_MIN;
   const label = (d: string) => {
     const dt = new Date(`${d}T12:00:00Z`);
@@ -76,6 +78,7 @@ export function WeekGrid({ days, items, today }: { days: { date: string; break: 
               <p className={cn("text-xs", d.date === today ? "text-accent" : "text-muted")}>{l.wd}</p>
               <p className="text-lg font-semibold leading-tight">{l.day}</p>
               <p className="h-4 truncate text-[11px] text-warn">{d.break ?? (d.week ? <span className="text-faint">Week {d.week}</span> : "")}</p>
+              <p className="h-4 truncate text-[11px] text-accent">{d.due ? `${d.due} homework due` : ""}</p>
             </div>
           );
         })}

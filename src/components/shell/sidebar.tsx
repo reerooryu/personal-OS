@@ -1,5 +1,5 @@
 "use client";
-import { Award, BarChart3, CalendarDays, LayoutDashboard, ListChecks, NotebookPen, Settings, Swords } from "lucide-react";
+import { Award, BarChart3, BookOpenCheck, CalendarDays, LayoutDashboard, ListChecks, NotebookPen, Settings, Swords } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ const NAV = [
   { href: "/statistics", label: "Statistics", icon: BarChart3 },
   { href: "/quests", label: "Quests", icon: Swords },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/homework", label: "Homework", icon: BookOpenCheck },
   { href: "/activities", label: "Activities", icon: ListChecks },
   { href: "/honors", label: "Honors", icon: Award },
   { href: "/settings", label: "Settings", icon: Settings },

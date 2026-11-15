@@ -2,16 +2,85 @@
   "weekAnchor": "2026-11-16",
   "socsFeedUrl": "webcal://calsync-pupil.example.com/CalendarSyncPupil.ashx?key=YOUR-PRIVATE-KEY",
   "slots": [
-    { "title": "English", "location": "S101", "kind": "lesson", "day": "Mon", "week": 1, "start": "07:50", "end": "08:45", "skill": "english" },
-    { "title": "Economics", "location": "S102", "kind": "lesson", "day": "Mon", "week": 2, "start": "07:50", "end": "09:45", "skill": "economics" },
-    { "title": "Biology tutoring", "kind": "tutoring", "day": "Mon", "week": null, "start": "20:30", "end": "22:00", "skill": "biology" },
-    { "title": "Library helper", "kind": "duty", "day": "Sun", "week": 2, "start": "11:30", "end": "13:00", "skill": "resilience", "xp": "small" }
+    {
+      "title": "English",
+      "location": "S101",
+      "kind": "lesson",
+      "day": "Mon",
+      "week": 1,
+      "start": "07:50",
+      "end": "08:45",
+      "skill": "english"
+    },
+    {
+      "title": "Economics",
+      "location": "S102",
+      "kind": "lesson",
+      "day": "Mon",
+      "week": 2,
+      "start": "07:50",
+      "end": "09:45",
+      "skill": "economics"
+    },
+    {
+      "title": "Biology tutoring",
+      "kind": "tutoring",
+      "day": "Mon",
+      "week": null,
+      "start": "20:30",
+      "end": "22:00",
+      "skill": "biology"
+    },
+    {
+      "title": "Library helper",
+      "kind": "duty",
+      "day": "Sun",
+      "week": 2,
+      "start": "11:30",
+      "end": "13:00",
+      "skill": "resilience",
+      "xp": "small"
+    }
   ],
   "events": [
-    { "title": "Mock exam", "location": "Hall", "date": "2026-11-28", "start": "08:00", "end": "11:00", "skill": "resilience", "xp": "small" }
+    {
+      "title": "Mock exam",
+      "location": "Hall",
+      "date": "2026-11-28",
+      "start": "08:00",
+      "end": "11:00",
+      "skill": "resilience",
+      "xp": "small"
+    }
   ],
   "breaks": [
-    { "name": "Christmas holidays", "from": "2026-12-19", "to": "2027-01-10", "scope": "everything" },
-    { "name": "Half term", "from": "2027-02-22", "to": "2027-02-26", "scope": "school" }
+    {
+      "name": "Christmas holidays",
+      "from": "2026-12-19",
+      "to": "2027-01-10",
+      "scope": "everything"
+    },
+    {
+      "name": "Half term",
+      "from": "2027-02-22",
+      "to": "2027-02-26",
+      "scope": "school"
+    }
+  ],
+  "homework": [
+    {
+      "title": "Worksheet",
+      "subject": "mathematics",
+      "due": "2026-11-16 10:05",
+      "description": "Mark using the mark scheme"
+    }
+  ],
+  "tests": [
+    {
+      "subject": "geography",
+      "kind": "test",
+      "date": "2026-11-20 07:50",
+      "durationMin": 115
+    }
   ]
 }

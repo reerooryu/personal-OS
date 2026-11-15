@@ -14,6 +14,7 @@ Every record is either a **source** (entered by the user) or **derived** (comput
 | Manual and user-edited journal entries | Automatic journal entries |
 | Settings and formula versions | Levels, grades and traits (computed on read) |
 | Timetable slots, one-off events, breaks, calendar rules, "Did you go?" answers | Activities created from answers (`source = "inbox"`) |
+| Homework and tests | Study sessions logged on tick-off, assessments from test results, Time Management (computed on read) |
 | Import items and import rules | Activities created from imports (ordinary activities with `source = "import"`) |
 
 The usage log (`usage_events`) is neither: it is not exported, not read by the engine, and can be cleared at any time.

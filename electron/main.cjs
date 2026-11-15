@@ -6,6 +6,7 @@
  * quick-log shortcut. All data lives in ~/Library/Application Support/ASCEND.
  */
 const { app, BrowserWindow, Menu, Notification, Tray, dialog, globalShortcut, ipcMain, nativeImage, powerMonitor, screen, shell, utilityProcess } = require("electron");
+const { execFile } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -89,6 +90,7 @@ async function startServer() {
   const serverJs = path.join(resources, "server", "server.js");
   const dataDir = app.getPath("userData");
   const startingRecord = path.join(resources, "starting-record.json");
+  const timetable = path.join(resources, "timetable.json");
   const port = await freePort();
   baseUrl = `http://127.0.0.1:${port}`;
   server = utilityProcess.fork(serverJs, [], {
@@ -103,6 +105,7 @@ async function startServer() {
       ASCEND_DATA_DIR: dataDir,
       ASCEND_MIGRATIONS_DIR: path.join(resources, "drizzle"),
       ...(fs.existsSync(startingRecord) ? { ASCEND_STARTING_RECORD: startingRecord } : {}),
+      ...(fs.existsSync(timetable) ? { ASCEND_TIMETABLE: timetable } : {}),
       NEXT_TELEMETRY_DISABLED: "1",
     },
   });
@@ -351,6 +354,75 @@ async function scanHealth() {
   }
 }
 
+// ---------------------------------------------------------------- calendar ---
+
+const FEED_MS = 30 * 60_000;
+const APPLE_CHECK_MS = 30 * 60_000;
+const APPLE_FORCE_MS = 12 * 3_600_000;
+let appleSyncing = null;
+let lastAppleHash = null;
+let lastAppleAt = 0;
+
+/** Re-reads the school's SOCS feed. Quiet on failure; Settings shows the error. */
+async function refreshFeed() {
+  if (!baseUrl) return;
+  try {
+    await fetch(`${baseUrl}/api/calendar/refresh`, { method: "POST" });
+  } catch {
+    /* try again next time */
+  }
+}
+
+function calendarHelper() {
+  const p = path.join(process.resourcesPath, "bin", "ascend-calendar");
+  return fs.existsSync(p) ? p : null;
+}
+
+function runHelper(helper, plan) {
+  return new Promise((resolve) => {
+    const child = execFile(helper, [], { timeout: 180_000, maxBuffer: 1024 * 1024 }, (err, stdout) => {
+      try {
+        resolve(JSON.parse(String(stdout).trim().split("\n").pop()));
+      } catch {
+        resolve({ ok: false, error: err ? String(err.message || err) : "No answer from the calendar helper", added: 0, updated: 0, removed: 0 });
+      }
+    });
+    child.stdin.end(JSON.stringify(plan));
+  });
+}
+
+/**
+ * Writes the timetable into the "ASCEND" calendar in Apple Calendar (iCloud,
+ * so it reaches the iPhone). Runs when the plan changed, or every 12 hours.
+ */
+async function syncAppleCalendar(force = false) {
+  if (!baseUrl) return { ok: false, error: "ASCEND is still starting", added: 0, updated: 0, removed: 0 };
+  if (appleSyncing) return appleSyncing;
+  appleSyncing = (async () => {
+    const helper = calendarHelper();
+    if (!helper) return { ok: false, error: "The calendar helper wasn't built. Run npm run package on the Mac with Xcode's command line tools installed.", added: 0, updated: 0, removed: 0 };
+    const plan = await fetch(`${baseUrl}/api/calendar/outbox`).then((r) => r.json());
+    if (!plan.items.length && !force) return { ok: true, added: 0, updated: 0, removed: 0, skipped: true };
+    if (!force && plan.hash === lastAppleHash && Date.now() - lastAppleAt < APPLE_FORCE_MS) return { ok: true, added: 0, updated: 0, removed: 0, skipped: true };
+    const result = await runHelper(helper, plan);
+    if (result.ok) {
+      lastAppleHash = plan.hash;
+      lastAppleAt = Date.now();
+    }
+    await fetch(`${baseUrl}/api/calendar/apple-status`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(result) }).catch(() => {});
+    return result;
+  })();
+  try {
+    return await appleSyncing;
+  } catch (e) {
+    return { ok: false, error: String(e), added: 0, updated: 0, removed: 0 };
+  } finally {
+    appleSyncing = null;
+  }
+}
+
+ipcMain.handle("calendar:sync", () => syncAppleCalendar(true));
+
 // --------------------------------------------------------------- lifecycle ---
 
 app.setName("ASCEND");
@@ -370,8 +442,20 @@ app.whenReady().then(async () => {
     console.warn(`Could not register ${SHORTCUT}; another app may be using it.`);
   }
   setTimeout(scanHealth, 10_000);
+  setTimeout(async () => {
+    await refreshFeed();
+    await syncAppleCalendar();
+  }, 15_000);
+  setInterval(refreshFeed, FEED_MS);
+  setInterval(() => syncAppleCalendar(), APPLE_CHECK_MS);
   setInterval(scanHealth, HEALTH_SCAN_MS);
-  powerMonitor.on("resume", () => setTimeout(scanHealth, 30_000));
+  powerMonitor.on("resume", () =>
+    setTimeout(async () => {
+      await scanHealth();
+      await refreshFeed();
+      await syncAppleCalendar();
+    }, 30_000),
+  );
 });
 
 app.on("activate", showMain);

@@ -4,5 +4,6 @@ interface Window {
     desktop: boolean;
     hideQuick: () => void;
     chooseFolder?: (defaultPath?: string) => Promise<string | null>;
+    syncCalendar?: () => Promise<{ ok: boolean; error?: string; added: number; updated: number; removed: number }>;
   };
 }

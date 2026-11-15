@@ -44,6 +44,11 @@ const SOURCE_TABLES = {
   activeTimer: t.activeTimer,
   importRules: t.importRules,
   importItems: t.importItems,
+  timetableSlots: t.timetableSlots,
+  calendarEvents: t.calendarEvents,
+  schoolBreaks: t.schoolBreaks,
+  calendarRules: t.calendarRules,
+  calendarConfirmations: t.calendarConfirmations,
 } satisfies Record<string, SQLiteTable>;
 
 type TableName = keyof typeof SOURCE_TABLES;

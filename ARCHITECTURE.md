@@ -13,6 +13,7 @@ Every record is either a **source** (entered by the user) or **derived** (comput
 | Achievement definitions | Achievement unlocks |
 | Manual and user-edited journal entries | Automatic journal entries |
 | Settings and formula versions | Levels, grades and traits (computed on read) |
+| Timetable slots, one-off events, breaks, calendar rules, "Did you go?" answers | Activities created from answers (`source = "inbox"`) |
 | Import items and import rules | Activities created from imports (ordinary activities with `source = "import"`) |
 
 The usage log (`usage_events`) is neither: it is not exported, not read by the engine, and can be cleared at any time.
@@ -88,6 +89,12 @@ The menu-bar icon talks to `/api/tray`. The global shortcut opens a small window
 ## Imports (`src/services/health-import.ts`)
 
 Every workout read from an Apple Health export becomes an `import_items` row, keyed by workout type and start minute (not the HealthKit id, which Garmin Connect rewrites). A rule per workout type says "log as skill X" or "ignore". Obvious types get a rule on first sight. Others stay `pending` for review. Logging checks for a hand-logged activity covering at least half the same time on the same skill and marks the item `matched` instead. Imported activities carry `externalId`, so reading a file again never duplicates them, and a deleted one stays deleted.
+
+## Calendar (`src/domain/calendar.ts`, `src/services/calendar.ts`)
+
+Occurrences are never stored. They are expanded on read from the timetable slots (rotation week from `weekAnchor`, Sundays count with the following week, breaks pause by scope), the one-off events, and the cached SOCS feed (`external_events`, replaced on each fetch, never exported). An occurrence key (`tt:<slot>:<date>`, `ev:<id>`, `feed:<uid>`) links it to its answer in `calendar_confirmations`. Logging uses `cal:<key>` as the client request id, so answering twice can't double-log.
+
+The desktop app pulls `/api/calendar/outbox` and pipes it to `native/calendar-sync.swift` (EventKit), which makes the "ASCEND" calendar match the plan for the window, touching only events marked `ascend://event/…`.
 
 ## Data location
 

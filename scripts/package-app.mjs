@@ -30,6 +30,21 @@ for (const f of fs.readdirSync(path.join(root, "dist-app/server"))) {
   if (/\.(pdf|db|db-wal|db-shm)$/i.test(f)) rm(`dist-app/server/${f}`);
 }
 cp("drizzle", "dist-app/drizzle");
+if (fs.existsSync(path.join(root, "private/timetable.json"))) {
+  cp("private/timetable.json", "dist-app/timetable.json");
+  console.log("   Included your private timetable (stays on this Mac, never in git).");
+}
+// The Apple Calendar helper needs macOS and the Swift compiler (Xcode command line tools).
+if (process.platform === "darwin") {
+  fs.mkdirSync(path.join(root, "dist-app/bin"), { recursive: true });
+  try {
+    run(`swiftc -O -swift-version 5 native/calendar-sync.swift -o dist-app/bin/ascend-calendar`);
+    run(`codesign --force --sign - dist-app/bin/ascend-calendar`);
+    console.log("   Built the Apple Calendar helper.");
+  } catch {
+    console.warn("   Skipped the Apple Calendar helper: install the command line tools with xcode-select --install, then package again.");
+  }
+}
 if (fs.existsSync(path.join(root, "private/starting-record.json"))) {
   cp("private/starting-record.json", "dist-app/starting-record.json");
   console.log("   Included your private starting record (stays on this Mac, never in git).");

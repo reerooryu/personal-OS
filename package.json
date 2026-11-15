@@ -85,7 +85,11 @@
       "identity": null,
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
-      "darkModeSupport": true
+      "darkModeSupport": true,
+      "extendInfo": {
+        "NSCalendarsUsageDescription": "ASCEND puts Ryu's timetable and tutoring into a calendar called ASCEND so they show on his iPhone.",
+        "NSCalendarsFullAccessUsageDescription": "ASCEND keeps a calendar called ASCEND up to date with Ryu's timetable and tutoring, so they show on his iPhone. It only changes events it created."
+      }
     }
   }
 }

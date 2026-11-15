@@ -23,6 +23,7 @@ import {
 import { appDb } from "@/services/bootstrap";
 import { getOpenedDb, dataDir } from "@/db/client";
 import { backupTo } from "@/services/data";
+import { answerCalendar, feedUrl, flipWeek, refreshFeed, setBreakScope, setCalendarRule, type CalendarAnswer } from "@/services/calendar";
 import { verify } from "@/services/engine";
 import {
   decideImport,
@@ -437,6 +438,67 @@ export async function deleteImportRuleAction(workoutType: string): Promise<Resul
 export async function returnToReviewAction(itemId: string): Promise<Result> {
   try {
     returnToReview(appDb(), itemId);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ---------------------------------------------------------------- calendar ---
+
+export async function answerCalendarAction(a: CalendarAnswer): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { result, reward } = withReward(db, () => answerCalendar(db, a), (r) => r.activityId);
+    done();
+    return { ok: true, reward, activityId: result.activityId ?? undefined };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function refreshFeedAction(): Promise<Result<{ count: number }>> {
+  const r = await refreshFeed(appDb());
+  done();
+  return r.ok ? { ok: true, count: r.count } : { ok: false, error: r.error };
+}
+
+export async function setFeedUrlAction(url: string): Promise<Result<{ count: number }>> {
+  try {
+    const db = appDb();
+    if (!url.trim()) {
+      setSetting(db, "socsFeedUrl", null);
+      done();
+      return { ok: true, count: 0 };
+    }
+    feedUrl(url);
+    setSetting(db, "socsFeedUrl", url.trim());
+    return refreshFeedAction();
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function flipWeekAction(): Promise<Result> {
+  try {
+    flipWeek(appDb());
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setBreakScopeAction(id: string, scope: "school" | "everything"): Promise<Result> {
+  setBreakScope(appDb(), id, scope);
+  done();
+  return { ok: true };
+}
+
+export async function setCalendarRuleAction(titleKey: string, rule: { action: "log" | "ignore"; skillId?: string | null; xp?: "normal" | "small" }): Promise<Result> {
+  try {
+    setCalendarRule(appDb(), titleKey, rule);
     done();
     return { ok: true };
   } catch (e) {

@@ -8,6 +8,7 @@ import path from "node:path";
 import { dataDir, getOpenedDb, type DB } from "@/db/client";
 import { seedDatabase } from "@/seed/seed";
 import { loadStartingRecord } from "@/seed/starting-record";
+import { syncTimetableFile } from "./calendar";
 import { backupTo } from "./data";
 import { isSeeded } from "./queries";
 
@@ -33,12 +34,27 @@ export function appDb(): DB {
         const record = process.env.ASCEND_STARTING_RECORD ? loadStartingRecord(process.env.ASCEND_STARTING_RECORD) : null;
         seedDatabase(db, { sample: true, startingRecord: record });
       }
+      loadTimetable(db, process.env.ASCEND_TIMETABLE);
       try {
         dailyBackup();
       } catch (e) {
         console.error("Backup failed", e);
       }
+    } else if (isSeeded(db)) {
+      // Development: read the private timetable from the project folder.
+      loadTimetable(db, path.join(process.cwd(), "private", "timetable.json"));
     }
   }
   return db;
+}
+
+/** Imports private/timetable.json (never in git) when it has changed. */
+function loadTimetable(db: DB, file: string | undefined) {
+  if (!file || !fs.existsSync(/* turbopackIgnore: true */ file)) return;
+  try {
+    const r = syncTimetableFile(db, fs.readFileSync(/* turbopackIgnore: true */ file, "utf8"));
+    if (r) console.log(`Timetable imported: ${r.slots} slots, ${r.events} events, ${r.breaks} breaks`);
+  } catch (e) {
+    console.error("Timetable import failed", e);
+  }
 }

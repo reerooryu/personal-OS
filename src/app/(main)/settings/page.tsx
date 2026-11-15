@@ -1,4 +1,5 @@
 import { ImportReview } from "@/components/imports/import-review";
+import { CalendarSettings } from "@/components/settings/calendar-settings";
 import { HealthSettings } from "@/components/settings/health-settings";
 import { CharacterName, DataTools } from "@/components/settings/settings-controls";
 import { UsagePanel } from "@/components/settings/usage-panel";
@@ -8,6 +9,7 @@ import { DIFFICULTY_LABELS, type Difficulty } from "@/domain/types";
 import { dataDir } from "@/db/client";
 import { appDb } from "@/services/bootstrap";
 import { currentFormula, getProfile } from "@/services/context";
+import { breakList, calendarRuleList, currentWeek, todayKey, upcomingTimetableCount } from "@/services/calendar";
 import { guessHealthFolder, importRuleList, importStats, pendingImports } from "@/services/health-import";
 import { getSetting } from "@/services/settings";
 import { usageSummary } from "@/services/usage";
@@ -21,6 +23,13 @@ export default function SettingsPage() {
   const f = currentFormula(db);
   const skills = skillChoices(db);
   const pending = pendingImports(db);
+  const feed = getSetting(db, "socsFeedUrl");
+  let feedHost: string | null = null;
+  try {
+    feedHost = feed ? new URL(feed.replace(/^webcals?:/i, "https:")).host : null;
+  } catch {
+    feedHost = "Link saved";
+  }
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <PageHeader title="Settings" />
@@ -49,6 +58,21 @@ export default function SettingsPage() {
           <Item k="Medal XP" v={`${f.params.medalTierXp.bronze} / ${f.params.medalTierXp.silver} / ${f.params.medalTierXp.gold}`} />
           <Item k="Day starts at" v={`${String(Math.floor(p.dayBoundaryMinutes / 60)).padStart(2, "0")}:00 (${p.timezone})`} />
           <Item k="Rest days per week" v={p.restDaysPerWeek} />
+        </CardBody>
+      </Card>
+      <Card id="calendar">
+        <CardHeader title="Calendar" />
+        <CardBody>
+          <CalendarSettings
+            feedHost={feedHost}
+            lastFetch={getSetting(db, "socsLastFetch")}
+            week={currentWeek(db, todayKey(db))}
+            slots={upcomingTimetableCount(db)}
+            breaks={breakList(db)}
+            rules={calendarRuleList(db)}
+            skills={skills}
+            apple={getSetting(db, "appleSync")}
+          />
         </CardBody>
       </Card>
       <Card id="apple-health">
@@ -80,7 +104,7 @@ export default function SettingsPage() {
         <CardBody className="space-y-2 text-sm">
           <div className="flex justify-between gap-4">
             <span>Google Calendar</span>
-            <span className="text-muted">Milestone 3</span>
+            <span className="text-muted">Not needed: the school calendar comes from SOCS, and ASCEND writes to Apple Calendar.</span>
           </div>
           <div className="flex justify-between gap-4">
             <span>Strava</span>

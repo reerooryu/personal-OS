@@ -477,3 +477,79 @@ export const usageEvents = sqliteTable(
   },
   (t) => [index("usage_events_at_idx").on(t.at)],
 );
+
+// -------------------------------------------------------------- CALENDAR ---
+
+/**
+ * The school timetable and regular tutoring: one row per slot in the two-week
+ * rotation. `week` is 1 or 2, or null for every week. Kept in
+ * private/timetable.json on the Mac (never in git) and imported from there.
+ */
+export const timetableSlots = sqliteTable("timetable_slots", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  location: text("location"),
+  /** lesson: shown, no XP. tutoring: confirm to log. duty: confirm, small XP. */
+  kind: text("kind", { enum: ["lesson", "tutoring", "duty"] }).notNull(),
+  /** 1 = Monday ... 7 = Sunday */
+  weekday: integer("weekday").notNull(),
+  week: integer("week"),
+  startMin: integer("start_min").notNull(),
+  endMin: integer("end_min").notNull(),
+  skillId: text("skill_id"),
+  xp: text("xp", { enum: ["none", "normal", "small"] }).notNull(),
+});
+
+/** One-off events (an exam, a trip). */
+export const calendarEvents = sqliteTable("calendar_events", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  location: text("location"),
+  startAt: integer("start_at").notNull(),
+  endAt: integer("end_at").notNull(),
+  skillId: text("skill_id"),
+  xp: text("xp", { enum: ["none", "normal", "small"] }).notNull(),
+});
+
+/** Holidays and closures. "school" pauses lessons and duties; "everything" pauses tutoring too. */
+export const schoolBreaks = sqliteTable("school_breaks", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  scope: text("scope", { enum: ["school", "everything"] }).notNull(),
+});
+
+/** What a school feed event counts as, by title ("vex robotics competition" → Robotics). */
+export const calendarRules = sqliteTable("calendar_rules", {
+  titleKey: text("title_key").primaryKey(),
+  action: text("action", { enum: ["log", "ignore"] }).notNull(),
+  skillId: text("skill_id"),
+  activityTypeId: text("activity_type_id"),
+  xp: text("xp", { enum: ["normal", "small"] }).notNull().default("normal"),
+});
+
+/** "Did you go?" answers, one per occurrence. */
+export const calendarConfirmations = sqliteTable("calendar_confirmations", {
+  occurrenceKey: text("occurrence_key").primaryKey(),
+  status: text("status", { enum: ["done", "skipped"] }).notNull(),
+  activityId: text("activity_id"),
+  decidedAt: integer("decided_at").notNull(),
+});
+
+/** Cache of the school's SOCS feed. Replaced on every successful fetch. */
+export const externalEvents = sqliteTable(
+  "external_events",
+  {
+    uid: text("uid").primaryKey(),
+    title: text("title").notNull(),
+    titleKey: text("title_key").notNull(),
+    location: text("location"),
+    category: text("category"),
+    startAt: integer("start_at").notNull(),
+    endAt: integer("end_at").notNull(),
+    allDay: bool("all_day").notNull(),
+    cancelled: bool("cancelled").notNull(),
+  },
+  (t) => [index("external_events_start_idx").on(t.startAt)],
+);

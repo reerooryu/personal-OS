@@ -1,5 +1,6 @@
 import { Flame, Trophy } from "lucide-react";
 import Link from "next/link";
+import { DidYouGo } from "@/components/calendar/did-you-go";
 import { ImportReview } from "@/components/imports/import-review";
 import { QuickLog } from "@/components/log/quick-log";
 import { Tiles, type TileData } from "@/components/log/tiles";
@@ -15,7 +16,7 @@ import { appDb } from "@/services/bootstrap";
 import { pendingImports } from "@/services/health-import";
 import { loadSkillTree } from "@/services/context";
 import { achievementList, attributeSummaries, characterSummary, medalCase, questBoard, unreadNotices } from "@/services/queries";
-import { activityHistory, sampleDataCount, suggestedNow, tiles, timerView, today, weekInReview, quickLogOptions, skillChoices } from "@/services/views";
+import { activityHistory, sampleDataCount, suggestedNow, tiles, timerView, today, weekInReview, quickLogOptions, skillChoices, calendarInboxItems } from "@/services/views";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export default function Overview() {
   const review = isMonday ? weekInReview(db, now) : null;
   const samples = sampleDataCount(db);
   const pending = pendingImports(db);
+  const inbox = calendarInboxItems(db, requestTime());
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -66,6 +68,13 @@ export default function Overview() {
       </div>
 
       <Notices items={unreadNotices(db)} />
+      {inbox.length > 0 && (
+        <Card className="mb-4">
+          <CardBody className="pt-5">
+            <DidYouGo items={inbox} skills={skillChoices(db)} limit={4} />
+          </CardBody>
+        </Card>
+      )}
       {pending.length > 0 && (
         <Card className="mb-4">
           <CardBody className="pt-5">

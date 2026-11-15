@@ -10,6 +10,7 @@ import { currentFormula, getFormula, getProfile, loadSkillTree, timeSettings } f
 import { evaluateQuestPeriod, Facts } from "./engine";
 import { getTimer } from "./activities";
 import { medalCase, questBoard, skillSummaries, xpTotals } from "./queries";
+import { calendarInbox } from "./calendar";
 
 export type TemplateRow = typeof t.activityTemplates.$inferSelect;
 
@@ -342,4 +343,20 @@ export function skillChoices(db: DB) {
   const o = formOptions(db);
   const attr = new Map(o.attributes.map((a) => [a.id, a.name]));
   return o.skills.map((s) => ({ id: s.id, name: s.name, attribute: attr.get(s.attributeId) ?? "" }));
+}
+
+/** "Did you go?" rows, ready for the client. */
+export function calendarInboxItems(db: DB, now = Date.now()) {
+  const names = new Map(db.select().from(t.skills).all().map((s) => [s.id, s.name]));
+  return calendarInbox(db, now).map((o) => ({
+    key: o.key,
+    title: o.title,
+    location: o.location,
+    startAt: o.startAt,
+    endAt: o.endAt,
+    kind: o.kind,
+    needsSkill: o.needsSkill,
+    skillName: o.skillId ? (names.get(o.skillId) ?? null) : null,
+    small: o.xp === "small",
+  }));
 }

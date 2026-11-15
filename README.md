@@ -2,7 +2,7 @@
 
 A private, RPG-style personal development app. Log an activity once, and the whole system responds: XP, levels, quests, medals, achievements, the journal and analytics.
 
-**Status: Milestone 2 of 4 (core screens and Mac app).** Overview, Statistics, Quests, Activities, Honors and Settings work, and ASCEND runs as a Mac app with a menu-bar quick log. Calendar, Journal and Analytics screens arrive in Milestone 3.
+**Status: Milestone 2 of 4 (core screens and Mac app).** Overview, Statistics, Quests, Calendar, Activities, Honors and Settings work, and ASCEND runs as a Mac app with a menu-bar quick log. Tasks, Journal and Analytics screens arrive in Milestone 3.
 
 ## Requirements
 
@@ -23,6 +23,17 @@ This builds `release/mac-arm64/ASCEND.app`. Drag it into Applications and open i
 - **In the app:** press **L** to log. Closing the window keeps ASCEND running in the menu bar. Quit from the menu bar or with ⌘Q.
 - **Updating:** after pulling new code, run `npm install && npm run package` again and replace the app in Applications. Your data is untouched.
 - A backup is written to the data folder once a day (the last 14 are kept). The server log is `server.log` in the same folder.
+
+## Calendar
+
+The Calendar page shows the school timetable (Week 1 and Week 2), tutoring, one-off events and the school's SOCS clubs.
+
+- **Timetable** lives in `private/timetable.json` (never in git, see `src/seed/timetable.example.json` for the format). The app reads it at startup when it changes, so edit the file and run `npm run package` again.
+- **SOCS clubs** are read from the pupil's private SOCS calendar link every 30 minutes. The link is in the private timetable file, or can be pasted in **Settings → Calendar**.
+- **Lessons** are shown but never earn XP. **Tutoring, clubs and duties** show up under "Did you go?" when they end: one tap logs them. Admissions Office and the military training exam earn deliberately small XP toward Resilience.
+- **Holidays:** "School only" closures pause lessons and duties. "Everything" pauses tutoring too (Christmas). Both are set per break in Settings.
+- **Week 1 / Week 2** alternate every calendar week from the anchor in the file. A Sunday counts as part of the week after it. If the school's rotation ever disagrees (after a holiday, say), use **Swap Week 1 and 2** in Settings.
+- **iPhone:** the timetable, tutoring and one-off events are written into a calendar called **ASCEND** in iCloud, eight weeks ahead, so they appear in Apple Calendar on the iPhone next to the SOCS events. The first sync asks for Calendar access. This needs the Swift compiler on the Mac when packaging (`xcode-select --install` if `npm run package` says it skipped the calendar helper). Because the app isn't signed with a developer certificate, macOS may ask for Calendar access again after a rebuild.
 
 ## Garmin workouts (Apple Health)
 
@@ -92,10 +103,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md). In short: activities, assessments and ot
 
 ## Added after Milestone 2
 
+- Calendar: two-week timetable, tutoring, holidays, SOCS clubs, "Did you go?" logging, and sync to Apple Calendar on the iPhone
+
 - Dropdown logger replaces typed entry everywhere (Overview, Activities, the L dialog, the ⌥⇧L window)
 - Apple Health workout import for the Garmin watch, with a review list and per-type rules
 - Usage log with a friction summary and CSV/JSON export
-- 103 tests
+- 117 tests
 
 ## Implemented in Milestone 1
 
@@ -114,8 +127,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md). In short: activities, assessments and ot
 ## Known limitations
 
 - The Mac app isn't signed with an Apple developer certificate. Built on your own Mac it opens normally; if macOS ever blocks it, right-click it and choose Open.
-- The inbox of scheduled sessions to confirm needs the calendar, so it arrives with Milestone 3.
 - Progression settings, activity templates and measurement types are shown but not yet editable in the app.
-- Calendar, tasks, journal and analytics screens come in Milestone 3. The Time Management trait needs tasks, so it shows "Not enough data" until then.
+- Tasks, journal and analytics screens come in Milestone 3. The calendar has no in-app editor yet: the timetable is edited in its file. The Time Management trait needs tasks, so it shows "Not enough data" until then.
 - Deterministic quest generation templates are not yet exposed in the UI. Two supporting quests are seeded by hand.
-- Apple Health is the only integration. Google Calendar arrives with Milestone 3.
+- Integrations: Apple Health (workouts in), SOCS (school calendar in), Apple Calendar (timetable out). Tasks and the journal arrive with Milestone 3.

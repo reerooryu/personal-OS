@@ -1,0 +1,28 @@
+{
+  "characterName": "Alex",
+  "medalAwards": [
+    {
+      "medalId": "abrsm-grade",
+      "occasionKey": "piano-grade-3",
+      "occasion": "Piano Performance Grade 3, Merit",
+      "date": "2025-07-01",
+      "tier": "bronze"
+    }
+  ],
+  "assessments": [
+    {
+      "skillId": "mathematics",
+      "measurementTypeId": "mathematics-gcse",
+      "date": "2025-10-01",
+      "rawLabel": "7",
+      "method": "school_report"
+    },
+    {
+      "skillId": "piano",
+      "measurementTypeId": "piano-abrsm",
+      "date": "2025-07-01",
+      "rawLabel": "Grade 3 Merit",
+      "method": "examination"
+    }
+  ]
+}

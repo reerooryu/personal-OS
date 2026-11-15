@@ -1,0 +1,406 @@
+/**
+ * ASCEND database schema.
+ *
+ * Tables are either SOURCE (entered by the user) or DERIVED (computed by the
+ * engine from sources). Derived tables must always be rebuildable from sources
+ * alone. See ARCHITECTURE.md.
+ */
+import { sql } from "drizzle-orm";
+import {
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/sqlite-core";
+
+const bool = (name: string) => integer(name, { mode: "boolean" });
+const json = <T>(name: string) => text(name, { mode: "json" }).$type<T>();
+const createdAt = () =>
+  integer("created_at")
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`);
+
+// ---------------------------------------------------------------- SOURCE ---
+
+export const profile = sqliteTable("profile", {
+  id: integer("id").primaryKey(),
+  characterName: text("character_name").notNull(),
+  timezone: text("timezone").notNull(),
+  dayBoundaryMinutes: integer("day_boundary_minutes").notNull(),
+  currentFormulaVersionId: integer("current_formula_version_id").notNull(),
+  gradeBands: json<{ grade: string; min: number }[]>("grade_bands").notNull(),
+  restDaysPerWeek: integer("rest_days_per_week").notNull(),
+  showSampleData: bool("show_sample_data").notNull(),
+});
+
+export const formulaVersions = sqliteTable("formula_versions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  params: json<import("@/domain/types").FormulaParams>("params").notNull(),
+  createdAt: createdAt(),
+});
+
+export const attributes = sqliteTable("attributes", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  icon: text("icon").notNull(),
+  color: text("color").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  archived: bool("archived").notNull().default(false),
+});
+
+export const skills = sqliteTable(
+  "skills",
+  {
+    id: text("id").primaryKey(),
+    attributeId: text("attribute_id")
+      .notNull()
+      .references(() => attributes.id),
+    parentId: text("parent_id"),
+    name: text("name").notNull(),
+    kind: text("kind", { enum: ["skill", "trait"] }).notNull(),
+    archived: bool("archived").notNull().default(false),
+    sortOrder: integer("sort_order").notNull(),
+    proficiencyModel: text("proficiency_model", { enum: ["primary", "weighted"] })
+      .notNull()
+      .default("primary"),
+    primaryMeasurementTypeId: text("primary_measurement_type_id"),
+    aliases: json<string[]>("aliases").notNull().default([]),
+  },
+  (t) => [index("skills_attribute_idx").on(t.attributeId)],
+);
+
+export const activityTypes = sqliteTable("activity_types", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+});
+
+export const activityTemplates = sqliteTable("activity_templates", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  aliases: json<string[]>("aliases").notNull().default([]),
+  activityTypeId: text("activity_type_id").notNull(),
+  difficulty: text("difficulty").notNull(),
+  durationMin: integer("duration_min").notNull(),
+  skills: json<{ skillId: string; weight: number }[]>("skills").notNull(),
+  pinned: bool("pinned").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  lastUsedAt: integer("last_used_at"),
+});
+
+export const activities = sqliteTable(
+  "activities",
+  {
+    id: text("id").primaryKey(),
+    clientRequestId: text("client_request_id"),
+    name: text("name").notNull(),
+    notes: text("notes"),
+    startAt: integer("start_at").notNull(),
+    durationMin: integer("duration_min").notNull(),
+    activityTypeId: text("activity_type_id").notNull(),
+    difficulty: text("difficulty").notNull(),
+    source: text("source", { enum: ["manual", "timer", "inbox", "task", "import"] }).notNull(),
+    externalId: text("external_id"),
+    templateId: text("template_id"),
+    revision: integer("revision").notNull().default(1),
+    formulaVersionId: integer("formula_version_id").notNull(),
+    isSample: bool("is_sample").notNull().default(false),
+    deletedAt: integer("deleted_at"),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at"),
+  },
+  (t) => [
+    uniqueIndex("activities_client_request_uq").on(t.clientRequestId),
+    uniqueIndex("activities_external_uq").on(t.source, t.externalId),
+    index("activities_start_idx").on(t.startAt),
+  ],
+);
+
+export const activitySkills = sqliteTable(
+  "activity_skills",
+  {
+    activityId: text("activity_id")
+      .notNull()
+      .references(() => activities.id),
+    skillId: text("skill_id").notNull(),
+    weight: integer("weight").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.activityId, t.skillId] })],
+);
+
+/** Snapshots of earlier versions of edited activities and assessments. */
+export const revisions = sqliteTable(
+  "revisions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    entityType: text("entity_type", { enum: ["activity", "assessment"] }).notNull(),
+    entityId: text("entity_id").notNull(),
+    revision: integer("revision").notNull(),
+    snapshot: json<Record<string, unknown>>("snapshot").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("revisions_entity_idx").on(t.entityType, t.entityId)],
+);
+
+export const measurementTypes = sqliteTable("measurement_types", {
+  id: text("id").primaryKey(),
+  skillId: text("skill_id").notNull(),
+  name: text("name").notNull(),
+  valueKind: text("value_kind", { enum: ["number", "time", "percent", "grade"] }).notNull(),
+  unit: text("unit"),
+  direction: text("direction", { enum: ["higher", "lower"] }).notNull(),
+  anchorLow: real("anchor_low"),
+  anchorHigh: real("anchor_high"),
+  gradeScale: json<{ label: string; score: number }[]>("grade_scale"),
+  weight: real("weight").notNull().default(1),
+});
+
+export const assessments = sqliteTable(
+  "assessments",
+  {
+    id: text("id").primaryKey(),
+    skillId: text("skill_id").notNull(),
+    measurementTypeId: text("measurement_type_id").notNull(),
+    assessedAt: integer("assessed_at").notNull(),
+    rawValue: real("raw_value"),
+    rawLabel: text("raw_label"),
+    method: text("method").notNull(),
+    notes: text("notes"),
+    evidence: text("evidence"),
+    activityId: text("activity_id"),
+    notRepresentative: bool("not_representative").notNull().default(false),
+    notRepresentativeReason: text("not_representative_reason"),
+    source: text("source", { enum: ["manual", "import"] }).notNull().default("manual"),
+    revision: integer("revision").notNull().default(1),
+    isSample: bool("is_sample").notNull().default(false),
+    deletedAt: integer("deleted_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("assessments_skill_idx").on(t.skillId)],
+);
+
+export const quests = sqliteTable("quests", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  kind: text("kind", { enum: ["daily", "weekly", "long_term"] }).notNull(),
+  difficulty: text("difficulty").notNull().default("normal"),
+  startAt: integer("start_at"),
+  endAt: integer("end_at"),
+  rewardXp: integer("reward_xp").notNull(),
+  status: text("status", { enum: ["proposed", "active", "archived"] }).notNull(),
+  /** Archived quests keep their history but stop counting from this time. */
+  archivedAt: integer("archived_at"),
+  parentQuestId: text("parent_quest_id"),
+  origin: text("origin", { enum: ["manual", "generated", "sample", "import"] }).notNull(),
+  isSample: bool("is_sample").notNull().default(false),
+  createdAt: createdAt(),
+});
+
+export const questSkills = sqliteTable(
+  "quest_skills",
+  {
+    questId: text("quest_id").notNull(),
+    skillId: text("skill_id").notNull(),
+    weight: integer("weight").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.questId, t.skillId] })],
+);
+
+/** Requirement sets are versioned. A version applies to periods starting at or after effectiveFrom. */
+export const questRequirementVersions = sqliteTable(
+  "quest_requirement_versions",
+  {
+    questId: text("quest_id").notNull(),
+    version: integer("version").notNull(),
+    effectiveFrom: integer("effective_from").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.questId, t.version] })],
+);
+
+export const questRequirements = sqliteTable("quest_requirements", {
+  id: text("id").primaryKey(),
+  questId: text("quest_id").notNull(),
+  version: integer("version").notNull(),
+  stageOrdinal: integer("stage_ordinal").notNull(),
+  stageTitle: text("stage_title"),
+  type: text("type", {
+    enum: ["duration", "sessions", "distinct_days", "assessment", "milestone", "subquests"],
+  }).notNull(),
+  title: text("title"),
+  target: real("target").notNull(),
+  filter: json<import("@/domain/types").RequirementFilter>("filter").notNull().default({}),
+  measurementTypeId: text("measurement_type_id"),
+  subQuestIds: json<string[]>("sub_quest_ids"),
+});
+
+export const questPrerequisites = sqliteTable(
+  "quest_prerequisites",
+  {
+    questId: text("quest_id").notNull(),
+    requiresQuestId: text("requires_quest_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.questId, t.requiresQuestId] })],
+);
+
+export const milestoneChecks = sqliteTable(
+  "milestone_checks",
+  {
+    requirementId: text("requirement_id").notNull(),
+    periodKey: text("period_key").notNull(),
+    checkedAt: integer("checked_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.requirementId, t.periodKey] })],
+);
+
+export const medals = sqliteTable("medals", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  tier: text("tier", { enum: ["bronze", "silver", "gold"] }).notNull(),
+  xpReward: integer("xp_reward"),
+  repeatable: bool("repeatable").notNull().default(false),
+  awardRule: text("award_rule", { enum: ["manual", "quest", "assessment"] }).notNull(),
+  linkedQuestId: text("linked_quest_id"),
+  linkedMeasurementTypeId: text("linked_measurement_type_id"),
+  linkedScoreThreshold: real("linked_score_threshold"),
+  isSample: bool("is_sample").notNull().default(false),
+});
+
+export const medalSkills = sqliteTable(
+  "medal_skills",
+  {
+    medalId: text("medal_id").notNull(),
+    skillId: text("skill_id").notNull(),
+    weight: integer("weight").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.medalId, t.skillId] })],
+);
+
+/**
+ * Medal awards. Manual awards are sources. Linked awards (origin = "linked")
+ * are derived from quest completions or assessments.
+ */
+export const medalAwards = sqliteTable(
+  "medal_awards",
+  {
+    id: text("id").primaryKey(),
+    medalId: text("medal_id").notNull(),
+    occasionKey: text("occasion_key").notNull(),
+    occasion: text("occasion"),
+    awardedAt: integer("awarded_at").notNull(),
+    origin: text("origin", { enum: ["manual", "linked"] }).notNull(),
+    tierOverride: text("tier_override", { enum: ["bronze", "silver", "gold"] }),
+    xpOverride: integer("xp_override"),
+    skillsOverride: json<{ skillId: string; weight: number }[]>("skills_override"),
+    evidence: text("evidence"),
+    notes: text("notes"),
+    source: text("source", { enum: ["manual", "import", "engine"] }).notNull(),
+    isSample: bool("is_sample").notNull().default(false),
+  },
+  (t) => [uniqueIndex("medal_awards_occasion_uq").on(t.medalId, t.occasionKey)],
+);
+
+export const achievements = sqliteTable("achievements", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  icon: text("icon").notNull().default("trophy"),
+  hidden: bool("hidden").notNull().default(false),
+  conditionType: text("condition_type").notNull(),
+  params: json<Record<string, unknown>>("params").notNull(),
+});
+
+export const journalEntries = sqliteTable(
+  "journal_entries",
+  {
+    id: text("id").primaryKey(),
+    type: text("type", { enum: ["auto", "manual"] }).notNull(),
+    day: text("day").notNull(),
+    activityId: text("activity_id"),
+    title: text("title"),
+    body: text("body").notNull(),
+    userEdited: bool("user_edited").notNull().default(false),
+    activityDeleted: bool("activity_deleted").notNull().default(false),
+    activityChangedSinceEdit: bool("activity_changed_since_edit").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at"),
+  },
+  (t) => [uniqueIndex("journal_activity_uq").on(t.activityId), index("journal_day_idx").on(t.day)],
+);
+
+export const activeTimer = sqliteTable("active_timer", {
+  id: integer("id").primaryKey(),
+  templateId: text("template_id").notNull(),
+  startedAt: integer("started_at").notNull(),
+});
+
+// --------------------------------------------------------------- DERIVED ---
+
+/** Append-only XP ledger. Corrections are new rows, never updates or deletes. */
+export const xpEntries = sqliteTable(
+  "xp_entries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    sourceType: text("source_type", {
+      enum: ["activity", "quest_completion", "medal_award"],
+    }).notNull(),
+    sourceId: text("source_id").notNull(),
+    targetType: text("target_type", { enum: ["character", "skill"] }).notNull(),
+    targetId: text("target_id").notNull(),
+    seq: integer("seq").notNull(),
+    amount: integer("amount").notNull(),
+    reason: text("reason", { enum: ["award", "correction"] }).notNull(),
+    formulaVersionId: integer("formula_version_id"),
+    breakdown: json<Record<string, unknown>>("breakdown"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("xp_entries_uq").on(t.sourceType, t.sourceId, t.targetType, t.targetId, t.seq),
+    index("xp_entries_target_idx").on(t.targetType, t.targetId),
+  ],
+);
+
+export const questContributions = sqliteTable(
+  "quest_contributions",
+  {
+    questId: text("quest_id").notNull(),
+    periodKey: text("period_key").notNull(),
+    requirementId: text("requirement_id").notNull(),
+    activityId: text("activity_id").notNull(),
+    amount: real("amount").notNull(),
+    stageOrdinal: integer("stage_ordinal").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.activityId, t.requirementId, t.periodKey] }),
+    index("quest_contrib_quest_idx").on(t.questId, t.periodKey),
+  ],
+);
+
+export const questCompletions = sqliteTable(
+  "quest_completions",
+  {
+    questId: text("quest_id").notNull(),
+    periodKey: text("period_key").notNull(),
+    completedAt: integer("completed_at").notNull(),
+    completedByRef: text("completed_by_ref"),
+  },
+  (t) => [primaryKey({ columns: [t.questId, t.periodKey] })],
+);
+
+export const achievementUnlocks = sqliteTable("achievement_unlocks", {
+  achievementId: text("achievement_id").primaryKey(),
+  unlockedAt: integer("unlocked_at").notNull(),
+  triggerRef: text("trigger_ref"),
+});
+
+export const notices = sqliteTable("notices", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  kind: text("kind").notNull(),
+  message: text("message").notNull(),
+  createdAt: createdAt(),
+  readAt: integer("read_at"),
+});

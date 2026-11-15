@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import * as t from "@/db/schema";
 import { DEFAULT_FORMULA } from "@/domain/defaults";
-import { createActivity, deleteActivity, findLikelyDuplicate, logTemplate, previewQuickEntry, restoreActivity, startTimer, stopTimer, updateActivity } from "@/services/activities";
+import { createActivity, deleteActivity, findLikelyDuplicate, logTemplate, restoreActivity, startTimer, stopTimer, updateActivity } from "@/services/activities";
 import { reconcileAfterActivity, reconcileAll, verify } from "@/services/engine";
 import { ValidationError } from "@/services/errors";
 import { questBoard, skillSummaries, unreadNotices } from "@/services/queries";
@@ -330,16 +330,5 @@ describe("quick logging", () => {
     startTimer(db, "tpl-piano", NOW - 300 * 60_000);
     expect(() => stopTimer(db, { now: NOW })).toThrow(/confirmation/);
     expect(stopTimer(db, { now: NOW, confirmLong: true }).activity.durationMin).toBe(300);
-  });
-
-  it("turns a typed line into a ready-to-save activity", () => {
-    const db = seededDb();
-    const p = previewQuickEntry(db, "volleyball 1h30 hard", NOW);
-    expect(p.input).toMatchObject({ name: "Volleyball practice", durationMin: 90, difficulty: "hard" });
-    expect(p.xp?.total).toBe(113);
-    expect(previewQuickEntry(db, "maths 45 past paper", NOW).input).toMatchObject({ name: "Maths revision", durationMin: 45, notes: "past paper" });
-    expect(previewQuickEntry(db, "physics", NOW).input?.durationMin).toBe(45);
-    expect(previewQuickEntry(db, "geography 30", NOW).input).toMatchObject({ name: "Geography", skills: [{ skillId: "geography", weight: 100 }] });
-    expect(previewQuickEntry(db, "zzz 30", NOW).problem).toMatch(/No matching/);
   });
 });

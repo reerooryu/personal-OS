@@ -1,10 +1,11 @@
 "use client";
 import * as React from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { QuickEntry } from "./quick-entry";
+import type { QuickLogOptions } from "@/services/views";
+import { QuickLog } from "./quick-log";
 
 /** Press L anywhere (outside a text field) to log. */
-export function QuickEntryDialog() {
+export function QuickEntryDialog({ options }: { options: QuickLogOptions }) {
   const [open, setOpen] = React.useState(false);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -20,8 +21,8 @@ export function QuickEntryDialog() {
   }, []);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent title="Quick log" description="Type what you did and press Enter.">
-        <QuickEntry autoFocus onDone={() => setOpen(false)} />
+      <DialogContent title="Quick log" description="Pick what you did, then press Log.">
+        <QuickLog options={options} autoFocus onDone={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );

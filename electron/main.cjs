@@ -3,7 +3,7 @@
  *
  * Starts the bundled Next.js server on a private local port, shows it in a
  * window, and adds a menu-bar icon (timer, one-click logging) and a global
- * quick-entry shortcut. All data lives in ~/Library/Application Support/ASCEND.
+ * quick-log shortcut. All data lives in ~/Library/Application Support/ASCEND.
  */
 const { app, BrowserWindow, Menu, Notification, Tray, dialog, globalShortcut, ipcMain, nativeImage, screen, shell, utilityProcess } = require("electron");
 const crypto = require("node:crypto");
@@ -285,7 +285,7 @@ function buildTrayMenu() {
     });
   }
   items.push({ type: "separator" });
-  items.push({ label: "Quick entry…", accelerator: SHORTCUT, click: toggleQuick });
+  items.push({ label: "Quick log…", accelerator: SHORTCUT, click: toggleQuick });
   items.push({ label: "Open ASCEND", click: showMain });
   items.push({
     label: "Open at login",

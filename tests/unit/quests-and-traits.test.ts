@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { parseQuickEntry, type Candidate } from "@/domain/parser";
 import { evaluateQuest, type ActivityFact, type RequirementDef } from "@/domain/quests";
 import { classifyDays, consistencyScore, firstCrossing, streaks } from "@/domain/traits";
 import { addDays } from "@/domain/time";
@@ -163,41 +162,5 @@ describe("traits and streaks", () => {
   it("finds the first crossing of a running total", () => {
     expect(firstCrossing([{ at: 3, amount: 5, ref: "c" }, { at: 1, amount: 5, ref: "a" }, { at: 2, amount: 5, ref: "b" }], 10)).toEqual({ at: 2, ref: "b" });
     expect(firstCrossing([{ at: 1, amount: 5, ref: "a" }], 10)).toBeNull();
-  });
-});
-
-describe("quick-entry parser", () => {
-  const C: Candidate[] = [
-    { kind: "template", id: "t-piano", name: "Piano practice", aliases: ["piano"] },
-    { kind: "skill", id: "tennis", name: "Tennis", aliases: [] },
-    { kind: "skill", id: "maths", name: "Mathematics", aliases: ["maths", "math"] },
-    { kind: "skill", id: "fm", name: "Further Mathematics", aliases: ["further maths", "fm"] },
-  ];
-
-  it("reads a name and minutes", () => {
-    expect(parseQuickEntry("piano 30", C)).toMatchObject({ durationMin: 30, match: { id: "t-piano" }, difficulty: null });
-  });
-
-  it("reads hours, minutes and difficulty", () => {
-    expect(parseQuickEntry("tennis 1h30 hard", C)).toMatchObject({ durationMin: 90, difficulty: "hard", match: { id: "tennis" } });
-    expect(parseQuickEntry("90m maths", C)).toMatchObject({ durationMin: 90, match: { id: "maths" } });
-    expect(parseQuickEntry("maths 1.5 hours", C).durationMin).toBe(90);
-    expect(parseQuickEntry("tennis 45 very hard", C).difficulty).toBe("very_hard");
-  });
-
-  it("keeps leftover words as notes", () => {
-    expect(parseQuickEntry("maths 45 past paper", C)).toMatchObject({ match: { id: "maths" }, notes: "past paper" });
-  });
-
-  it("prefers the longer phrase", () => {
-    expect(parseQuickEntry("further maths 40", C).match?.id).toBe("fm");
-  });
-
-  it("falls back to a prefix match", () => {
-    expect(parseQuickEntry("mathem 20", C).match?.id).toBe("maths");
-  });
-
-  it("returns no match for unknown words", () => {
-    expect(parseQuickEntry("xyz 20", C)).toMatchObject({ match: null, durationMin: 20 });
   });
 });

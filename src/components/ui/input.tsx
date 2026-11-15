@@ -9,7 +9,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
 Input.displayName = "Input";
 
 export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(({ className, ...props }, ref) => (
-  <select ref={ref} className={cn(field, "h-9 appearance-none pr-8", className)} {...props} />
+  <select ref={ref} className={cn(field, "select-chevron h-9 cursor-pointer appearance-none pr-8", className)} {...props} />
 ));
 Select.displayName = "Select";
 

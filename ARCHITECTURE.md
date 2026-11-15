@@ -18,7 +18,7 @@ Every record is either a **source** (entered by the user) or **derived** (comput
 
 | Folder | Holds | Rules |
 | --- | --- | --- |
-| `src/domain` | XP, levels, time periods, proficiency, quest evaluation, traits, the quick-entry parser | Pure functions. No database, no React, no clock. |
+| `src/domain` | XP, levels, time periods, proficiency, quest evaluation, traits | Pure functions. No database, no React, no clock. |
 | `src/services` | The reconcile engine and everything that writes | Owns every database transaction |
 | `src/db` | Schema and connection | No business rules |
 | `src/validation` | Zod schemas | Shared by forms and services |

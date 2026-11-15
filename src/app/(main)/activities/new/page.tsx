@@ -20,7 +20,7 @@ export default async function NewActivityPage({ searchParams }: { searchParams: 
   const duration = Number(p.duration ?? 30);
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title="Log an activity" subtitle="For anything a tile or a typed line can't capture: split skills, backdating, measured results." />
+      <PageHeader title="Log an activity" subtitle="For anything the quick logger can't capture: split skills, backdating, measured results." />
       <Card>
         <CardBody className="pt-5">
           <NewActivity

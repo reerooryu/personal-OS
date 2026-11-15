@@ -7,7 +7,7 @@ import { skillSummaries } from "@/services/queries";
 import { createAssessment } from "@/services/records";
 import { withReward } from "@/services/rewards";
 import { createSkill, deleteSkill, moveSkill, renameSkill, setSkillArchived } from "@/services/skills";
-import { activityDetail, questDetail, suggestedNow, today, weekInReview } from "@/services/views";
+import { activityDetail, questDetail, quickLogOptions, suggestedNow, today, weekInReview } from "@/services/views";
 import { NOW, bkk, piano, seededDb, skillXp } from "./helpers";
 
 describe("reward summary", () => {
@@ -120,5 +120,17 @@ describe("screen read models", () => {
     const q = questDetail(db, "weekly-piano", NOW)!;
     expect(q.contributions.map((c) => c.activityId)).toEqual([activity.id]);
     expect(q.history).toHaveLength(1);
+  });
+});
+
+describe("dropdown logger options", () => {
+  it("offers every template and every active skill, with a sensible default type", () => {
+    const db = seededDb();
+    const o = quickLogOptions(db);
+    expect(o.templates.length).toBeGreaterThan(5);
+    expect(o.templates.every((x) => x.skills.length > 0)).toBe(true);
+    expect(o.skills.find((s) => s.name === "Mathematics")?.activityTypeId).toBe("study");
+    expect(o.skills.find((s) => s.name === "Tennis")?.activityTypeId).toBe("training");
+    expect(o.skills.find((s) => s.name === "Piano")?.activityTypeId).toBe("practice");
   });
 });

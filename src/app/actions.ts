@@ -13,7 +13,7 @@ import {
   deleteActivity,
   findLikelyDuplicate,
   logTemplate,
-  previewQuickEntry,
+  previewXp,
   restoreActivity,
   startTimer,
   stopTimer,
@@ -66,10 +66,8 @@ export async function logTemplateAction(templateId: string, clientRequestId: str
   }
 }
 
-export async function previewEntryAction(text: string) {
-  const db = appDb();
-  const p = previewQuickEntry(db, text);
-  return { input: p.input, xp: p.xp?.total ?? null, problem: p.problem };
+export async function previewXpAction(a: { durationMin: number; difficulty: string; activityTypeId: string }): Promise<number> {
+  return previewXp(appDb(), a).total;
 }
 
 export async function createActivityAction(input: ActivityInput, opts: { confirmDuplicate?: boolean } = {}): Promise<Rewarded> {

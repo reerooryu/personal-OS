@@ -3,7 +3,8 @@ import { Check } from "lucide-react";
 import * as React from "react";
 import { RewardProvider } from "@/components/reward/reward-provider";
 import { fmt } from "@/lib/utils";
-import { QuickEntry } from "./quick-entry";
+import type { QuickLogOptions } from "@/services/views";
+import { QuickLog } from "./quick-log";
 
 declare global {
   interface Window {
@@ -11,8 +12,8 @@ declare global {
   }
 }
 
-/** The compact bar opened by the global shortcut: type, Enter, see the result, done. */
-export function QuickWindow() {
+/** The compact bar opened by the global shortcut: pick, Log, see the result, done. */
+export function QuickWindow({ options }: { options: QuickLogOptions }) {
   const [done, setDone] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const hide = React.useCallback(() => window.ascend?.hideQuick(), []);
@@ -30,7 +31,9 @@ export function QuickWindow() {
               <Check className="size-4" /> {done}
             </div>
           ) : (
-            <QuickEntry
+            <QuickLog
+              options={options}
+              compact
               autoFocus
               onSaved={(r, name) => {
                 const extra = [r.character.leveledUp ? `Level ${r.character.level}!` : null, ...r.questsCompleted.map((q) => `Completed ${q}`)].filter(Boolean);
@@ -41,7 +44,7 @@ export function QuickWindow() {
             />
           )}
         </div>
-        <p className={error ? "mt-2 truncate text-[11px] text-bad" : "mt-2 text-[11px] text-faint"}>{error ?? "Enter to log · Esc to close"}</p>
+        <p className={error ? "mt-2 truncate text-[11px] text-bad" : "mt-2 text-[11px] text-faint"}>{error ?? "Esc to close"}</p>
       </div>
     </RewardProvider>
   );

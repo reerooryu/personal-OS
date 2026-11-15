@@ -65,8 +65,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md). In short: activities, assessments and ot
 
 ## Implemented in Milestone 2
 
-- Mac app (Electron): own window, menu-bar icon with running timer and one-click logging, global quick-entry shortcut, open at login, single instance, daily backups, first-launch setup
-- Overview: logging tiles, "Suggested now", typed entry, timer, character card, today ring, attributes, active quests, recent activities, honors, week in review (Mondays), notices
+- Mac app (Electron): own window, menu-bar icon with running timer and one-click logging, global quick-log shortcut (⌥⇧L), open at login, single instance, daily backups, first-launch setup
+- Overview: logging tiles, "Suggested now", dropdown logger, timer, character card, today ring, attributes, active quests, recent activities, honors, week in review (Mondays), notices
 - The reward moment: XP count-up, level bars, quest progress, completions, and celebrations for level-ups, grade-ups and medals, with Undo
 - Activities: history by day, full log form (split skills, backdating, measured results, duplicate and long-session checks), detail page with the XP calculation, ledger, quest contributions, journal entry and edit history
 - Statistics: skill tree with levels, time and grades; skill pages with assessments (and "not representative"), XP history and skill management (add, rename, move, archive, delete)
@@ -80,7 +80,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md). In short: activities, assessments and ot
 - XP formula with taper, difficulty and type multipliers, and formula versions
 - Character, skill and attribute levels; proficiency with grades from F to S
 - Activities: create, edit (with revision history), delete, undo, duplicate protection, imports keyed by external ID
-- Quick logging: one-tap templates, timer, and typed entries such as `piano 30` or `tennis 1h30 hard`
+- Quick logging: one-tap templates, a timer, and a dropdown logger (activity, length, difficulty, when). No typing anywhere
 - Quests: daily, weekly and long-term; durations, sessions, distinct days, assessments, milestones and sub-quests; stages; prerequisites; versioned requirements; rewards issued exactly once
 - Medals (manual, or linked to quests and assessments) and data-driven achievements, including hidden ones
 - Traits computed from behavior: Consistency, Discipline

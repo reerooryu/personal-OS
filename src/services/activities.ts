@@ -3,10 +3,9 @@ import { and, eq, gte, isNull, lte } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { DB, Tx } from "@/db/client";
 import * as t from "@/db/schema";
-import { parseQuickEntry, type Candidate, type ParsedEntry } from "@/domain/parser";
 import { computeXp, type XpBreakdown } from "@/domain/xp";
 import { activityInput, type ActivityInput } from "@/validation/schemas";
-import { ChangeLog, currentFormula, getFormula } from "./context";
+import { ChangeLog, currentFormula } from "./context";
 import { reconcileAfterActivity, reconcileAfterAssessment } from "./engine";
 import { ValidationError, parse } from "./errors";
 
@@ -278,72 +277,4 @@ export function stopTimer(db: DB, opts: { now?: number; clientRequestId?: string
   );
   cancelTimer(db);
   return res;
-}
-
-export function quickEntryCandidates(db: DB): Candidate[] {
-  const templates = db.select().from(t.activityTemplates).all();
-  const skills = db.select().from(t.skills).all().filter((s) => s.kind === "skill" && !s.archived);
-  return [
-    ...templates.map((x) => ({ kind: "template" as const, id: x.id, name: x.name, aliases: x.aliases })),
-    ...skills.map((x) => ({ kind: "skill" as const, id: x.id, name: x.name, aliases: x.aliases })),
-  ];
-}
-
-/** The template to use when a typed line names a skill: one that trains only that skill, pinned or most recent first. */
-function preferredTemplateFor(db: DB, skillId: string) {
-  const options = db
-    .select()
-    .from(t.activityTemplates)
-    .all()
-    .filter((x) => x.skills.length === 1 && x.skills[0]!.skillId === skillId);
-  options.sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.sortOrder - b.sortOrder);
-  return options[0] ?? null;
-}
-
-export interface QuickEntryPreview {
-  parsed: ParsedEntry;
-  input: ActivityInput | null;
-  xp: XpBreakdown | null;
-  problem: string | null;
-}
-
-/** Turns a typed line into a ready-to-save activity, without saving it. */
-export function previewQuickEntry(db: DB, text: string, now = Date.now()): QuickEntryPreview {
-  const parsed = parseQuickEntry(text, quickEntryCandidates(db));
-  if (!parsed.match) return { parsed, input: null, xp: null, problem: "No matching template or skill. Try the skill name, like \"piano 30\"." };
-  let base: Omit<ActivityInput, "startAt">;
-  if (parsed.match.kind === "template") {
-    const tpl = db.select().from(t.activityTemplates).where(eq(t.activityTemplates.id, parsed.match.id)).get()!;
-    base = {
-      name: tpl.name,
-      durationMin: parsed.durationMin ?? tpl.durationMin,
-      activityTypeId: tpl.activityTypeId,
-      difficulty: (parsed.difficulty ?? tpl.difficulty) as ActivityInput["difficulty"],
-      skills: tpl.skills,
-      templateId: tpl.id,
-    };
-  } else if (preferredTemplateFor(db, parsed.match.id)) {
-    // "maths 45" uses the Maths revision template rather than a bare skill entry.
-    const tpl = preferredTemplateFor(db, parsed.match.id)!;
-    base = {
-      name: tpl.name,
-      durationMin: parsed.durationMin ?? tpl.durationMin,
-      activityTypeId: tpl.activityTypeId,
-      difficulty: (parsed.difficulty ?? tpl.difficulty) as ActivityInput["difficulty"],
-      skills: tpl.skills,
-      templateId: tpl.id,
-    };
-  } else {
-    const skill = db.select().from(t.skills).where(eq(t.skills.id, parsed.match.id)).get()!;
-    if (parsed.durationMin === null) return { parsed, input: null, xp: null, problem: "Add a duration, like \"30\" or \"1h30\"." };
-    base = {
-      name: skill.name,
-      durationMin: parsed.durationMin,
-      activityTypeId: "practice",
-      difficulty: parsed.difficulty ?? "normal",
-      skills: [{ skillId: skill.id, weight: 100 }],
-    };
-  }
-  const input: ActivityInput = { ...base, notes: parsed.notes, startAt: now - base.durationMin * 60_000, confirmLong: true };
-  return { parsed, input, xp: computeXp({ durationMin: base.durationMin, difficulty: base.difficulty, activityTypeId: base.activityTypeId }, getFormula(db, currentFormula(db).id)), problem: null };
 }

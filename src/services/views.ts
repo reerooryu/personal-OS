@@ -317,3 +317,22 @@ export function sampleDataCount(db: DB): number {
 export function totals(db: DB) {
   return xpTotals(db);
 }
+
+const DEFAULT_TYPE_BY_ATTRIBUTE: Record<string, string> = { academics: "study", athletics: "training", engineering: "project" };
+
+/** Choices for the dropdown logger: templates first, then any skill on its own. */
+export function quickLogOptions(db: DB) {
+  const skills = formOptions(db).skills;
+  return {
+    templates: tiles(db).map((x) => ({
+      id: x.id,
+      name: x.name,
+      durationMin: x.durationMin,
+      difficulty: x.difficulty,
+      activityTypeId: x.activityTypeId,
+      skills: x.skills,
+    })),
+    skills: skills.map((k) => ({ id: k.id, name: k.name, activityTypeId: DEFAULT_TYPE_BY_ATTRIBUTE[k.attributeId] ?? "practice" })),
+  };
+}
+export type QuickLogOptions = ReturnType<typeof quickLogOptions>;

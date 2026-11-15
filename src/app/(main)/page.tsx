@@ -1,6 +1,6 @@
 import { Flame, Trophy } from "lucide-react";
 import Link from "next/link";
-import { QuickEntry } from "@/components/log/quick-entry";
+import { QuickLog } from "@/components/log/quick-log";
 import { Tiles, type TileData } from "@/components/log/tiles";
 import { TimerBar } from "@/components/log/timer-bar";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { dateLabel, fmt, minutesLabel } from "@/lib/utils";
 import { appDb } from "@/services/bootstrap";
 import { loadSkillTree } from "@/services/context";
 import { achievementList, attributeSummaries, characterSummary, medalCase, questBoard, unreadNotices } from "@/services/queries";
-import { activityHistory, sampleDataCount, suggestedNow, tiles, timerView, today, weekInReview } from "@/services/views";
+import { activityHistory, sampleDataCount, suggestedNow, tiles, timerView, today, weekInReview, quickLogOptions } from "@/services/views";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +76,7 @@ export default function Overview() {
       <Card className="mb-5">
         <CardBody className="space-y-4 pt-5">
           {timer && <TimerBar name={timer.name} startedAt={timer.startedAt} />}
-          <QuickEntry />
+          <QuickLog options={quickLogOptions(db)} />
           <Tiles tiles={tileList} suggested={suggested} timerRunning={!!timer} />
         </CardBody>
       </Card>

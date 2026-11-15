@@ -1,12 +1,12 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { QuickEntry } from "@/components/log/quick-entry";
+import { QuickLog } from "@/components/log/quick-log";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { ActivityRow, Empty, PageHeader } from "@/components/views/bits";
 import { dateLabel, fmt, minutesLabel } from "@/lib/utils";
 import { appDb } from "@/services/bootstrap";
-import { activityHistory, formOptions } from "@/services/views";
+import { activityHistory, formOptions, quickLogOptions } from "@/services/views";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: P
       />
       <Card className="mb-5">
         <CardBody className="pt-5">
-          <QuickEntry />
+          <QuickLog options={quickLogOptions(db)} />
         </CardBody>
       </Card>
       <form className="mb-4 flex items-center gap-2 text-sm">

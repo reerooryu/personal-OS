@@ -1,0 +1,333 @@
+"use server";
+/**
+ * Server actions. Each one calls a service and returns a plain result. No
+ * progression math happens here: the services and the engine own all of it.
+ */
+import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import * as t from "@/db/schema";
+import { clearSampleData } from "@/seed/seed";
+import {
+  cancelTimer,
+  createActivity,
+  deleteActivity,
+  findLikelyDuplicate,
+  logTemplate,
+  previewQuickEntry,
+  restoreActivity,
+  startTimer,
+  stopTimer,
+  updateActivity,
+  type ActivityPatch,
+} from "@/services/activities";
+import { appDb } from "@/services/bootstrap";
+import { getOpenedDb, dataDir } from "@/db/client";
+import { backupTo } from "@/services/data";
+import { verify } from "@/services/engine";
+import { ValidationError, type Issue } from "@/services/errors";
+import {
+  awardMedal,
+  createAssessment,
+  createQuest,
+  deleteAssessment,
+  deleteQuest,
+  removeMedalAward,
+  setMilestone,
+  setQuestStatus,
+  updateAssessment,
+} from "@/services/records";
+import { withReward, type RewardSummary } from "@/services/rewards";
+import { createSkill, deleteSkill, moveSkill, renameSkill, setSkillArchived } from "@/services/skills";
+import type { ActivityInput, AssessmentInput, MedalAwardInput, QuestInput } from "@/validation/schemas";
+import path from "node:path";
+
+export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string; issues?: Issue[]; code?: string };
+
+function fail(e: unknown): { ok: false; error: string; issues?: Issue[] } {
+  if (e instanceof ValidationError) return { ok: false, error: e.message, issues: e.issues };
+  console.error(e);
+  return { ok: false, error: "Something went wrong. Nothing was saved." };
+}
+
+function done() {
+  revalidatePath("/", "layout");
+}
+
+type Rewarded = Result<{ reward: RewardSummary; activityId?: string; name?: string }>;
+
+export async function logTemplateAction(templateId: string, clientRequestId: string): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { result, reward } = withReward(db, () => logTemplate(db, templateId, { clientRequestId }), (r) => r.activity.id);
+    done();
+    return { ok: true, reward, activityId: result.activity.id, name: result.activity.name };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function previewEntryAction(text: string) {
+  const db = appDb();
+  const p = previewQuickEntry(db, text);
+  return { input: p.input, xp: p.xp?.total ?? null, problem: p.problem };
+}
+
+export async function createActivityAction(input: ActivityInput, opts: { confirmDuplicate?: boolean } = {}): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    if (!opts.confirmDuplicate) {
+      const dup = findLikelyDuplicate(db, input);
+      if (dup && dup.clientRequestId !== input.clientRequestId) {
+        return { ok: false, code: "duplicate", error: `This looks like a duplicate of "${dup.name}" logged at the same time.` };
+      }
+    }
+    const { result, reward } = withReward(db, () => createActivity(db, input), (r) => r.activity.id);
+    done();
+    return { ok: true, reward, activityId: result.activity.id, name: result.activity.name };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function updateActivityAction(id: string, patch: ActivityPatch): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { reward } = withReward(db, () => updateActivity(db, id, patch), () => id);
+    done();
+    return { ok: true, reward, activityId: id };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteActivityAction(id: string): Promise<Result> {
+  try {
+    deleteActivity(appDb(), id);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function restoreActivityAction(id: string): Promise<Result> {
+  try {
+    restoreActivity(appDb(), id);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function startTimerAction(templateId: string): Promise<Result> {
+  try {
+    startTimer(appDb(), templateId);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function stopTimerAction(opts: { confirmLong?: boolean } = {}): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { result, reward } = withReward(db, () => stopTimer(db, { confirmLong: opts.confirmLong }), (r) => r.activity.id);
+    done();
+    return { ok: true, reward, activityId: result.activity.id, name: result.activity.name };
+  } catch (e) {
+    const r = fail(e);
+    if (r.issues?.some((i) => i.path === "confirmLong")) return { ...r, code: "confirm_long" };
+    return r;
+  }
+}
+
+export async function cancelTimerAction(): Promise<Result> {
+  cancelTimer(appDb());
+  done();
+  return { ok: true };
+}
+
+export async function createAssessmentAction(input: AssessmentInput): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { reward } = withReward(db, () => createAssessment(db, input));
+    done();
+    return { ok: true, reward };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function updateAssessmentAction(id: string, patch: Partial<AssessmentInput>): Promise<Result> {
+  try {
+    updateAssessment(appDb(), id, patch);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteAssessmentAction(id: string): Promise<Result> {
+  try {
+    deleteAssessment(appDb(), id);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function createQuestAction(input: QuestInput): Promise<Result<{ id: string }>> {
+  try {
+    const q = createQuest(appDb(), input);
+    done();
+    return { ok: true, id: q.id };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setQuestStatusAction(id: string, status: "proposed" | "active" | "archived"): Promise<Result> {
+  try {
+    setQuestStatus(appDb(), id, status);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteQuestAction(id: string): Promise<Result> {
+  try {
+    deleteQuest(appDb(), id);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setMilestoneAction(requirementId: string, periodKey: string, checked: boolean): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { reward } = withReward(db, () => setMilestone(db, requirementId, periodKey, checked));
+    done();
+    return { ok: true, reward };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function awardMedalAction(input: MedalAwardInput): Promise<Rewarded> {
+  try {
+    const db = appDb();
+    const { reward } = withReward(db, () => awardMedal(db, input));
+    done();
+    return { ok: true, reward };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function removeMedalAwardAction(id: string): Promise<Result> {
+  try {
+    removeMedalAward(appDb(), id);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function createSkillAction(input: { name: string; attributeId: string; parentId?: string | null }): Promise<Result<{ id: string }>> {
+  try {
+    const s = createSkill(appDb(), input);
+    done();
+    return { ok: true, id: s.id };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function renameSkillAction(id: string, name: string): Promise<Result> {
+  try {
+    renameSkill(appDb(), id, name);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function moveSkillAction(id: string, attributeId: string, parentId: string | null): Promise<Result> {
+  try {
+    moveSkill(appDb(), id, attributeId, parentId);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function archiveSkillAction(id: string, archived: boolean): Promise<Result> {
+  setSkillArchived(appDb(), id, archived);
+  done();
+  return { ok: true };
+}
+
+export async function deleteSkillAction(id: string): Promise<Result> {
+  try {
+    deleteSkill(appDb(), id);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setTemplatePinnedAction(id: string, pinned: boolean): Promise<Result> {
+  appDb().update(t.activityTemplates).set({ pinned }).where(eq(t.activityTemplates.id, id)).run();
+  done();
+  return { ok: true };
+}
+
+export async function markNoticesReadAction(): Promise<Result> {
+  appDb().update(t.notices).set({ readAt: Date.now() }).run();
+  done();
+  return { ok: true };
+}
+
+export async function renameCharacterAction(name: string): Promise<Result> {
+  const n = name.trim();
+  if (!n || n.length > 40) return { ok: false, error: "Use a name under 40 characters" };
+  appDb().update(t.profile).set({ characterName: n }).where(eq(t.profile.id, 1)).run();
+  done();
+  return { ok: true };
+}
+
+export async function clearSampleDataAction(): Promise<Result> {
+  try {
+    backupTo(getOpenedDb(), path.join(dataDir(), "backups"));
+    clearSampleData(appDb());
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function verifyAction(): Promise<Result<{ differences: string[] }>> {
+  return { ok: true, differences: verify(appDb()).slice(0, 50) };
+}
+
+export async function backupNowAction(): Promise<Result<{ file: string }>> {
+  try {
+    appDb();
+    return { ok: true, file: backupTo(getOpenedDb(), path.join(dataDir(), "backups")) };
+  } catch (e) {
+    return fail(e);
+  }
+}

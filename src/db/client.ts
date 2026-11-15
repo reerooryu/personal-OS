@@ -46,7 +46,11 @@ export function openDb(file?: string): OpenedDb {
 let shared: OpenedDb | undefined;
 
 /** The app-wide connection, opened lazily. */
-export function getDb(): DB {
+export function getOpenedDb(): OpenedDb {
   if (!shared) shared = openDb();
-  return shared.db;
+  return shared;
+}
+
+export function getDb(): DB {
+  return getOpenedDb().db;
 }

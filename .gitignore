@@ -23,3 +23,6 @@ evidence/
 # Environment and OS files
 .env*
 .DS_Store
+
+# Desktop app builds
+dist-app/

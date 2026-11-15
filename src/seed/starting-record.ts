@@ -54,8 +54,8 @@ export function noonOn(date: string, tz = DEFAULT_TIMEZONE): number {
 }
 
 export function loadStartingRecord(file = path.join(process.cwd(), "private", "starting-record.json")): StartingRecord | null {
-  if (!fs.existsSync(file)) return null;
-  return startingRecordSchema.parse(JSON.parse(fs.readFileSync(file, "utf8")));
+  if (!fs.existsSync(/* turbopackIgnore: true */ file)) return null;
+  return startingRecordSchema.parse(JSON.parse(fs.readFileSync(/* turbopackIgnore: true */ file, "utf8")));
 }
 
 export function importStartingRecord(db: DB, record: StartingRecord) {

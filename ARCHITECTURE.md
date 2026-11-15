@@ -69,6 +69,19 @@ Changing requirements creates a new requirement version. Recurring quests use it
 
 All timestamps are UTC milliseconds. `src/domain/time.ts` is the only place that converts to local days and weeks.
 
+## The desktop app (`electron/`)
+
+`electron/main.cjs` starts the bundled Next.js standalone server with Electron's `utilityProcess` on a random free port bound to 127.0.0.1, waits for `/api/health`, and loads it in a window. It sets:
+
+- `ASCEND_DATA_DIR` to `~/Library/Application Support/ASCEND`
+- `ASCEND_MIGRATIONS_DIR` to the bundled `drizzle/` folder
+- `ASCEND_STARTING_RECORD` to the bundled starting record, if one was packaged
+- `ASCEND_DESKTOP=1`, which turns on first-launch seeding and daily backups (`src/services/bootstrap.ts`)
+
+The menu-bar icon talks to `/api/tray`. The global shortcut opens a small window on `/quick`. `better-sqlite3` uses Node-API prebuilt binaries, so the same binary works in Node and in Electron with no rebuild.
+
+`npm run package` (`scripts/package-app.mjs`) builds the standalone server, copies it with its static files, migrations and the optional starting record into `dist-app/`, runs electron-builder (the app archive holds only `electron/`), copies `dist-app/` into the app's Resources in an `afterPack` hook, and ad-hoc signs the app for this Mac.
+
 ## Data location
 
-Development uses `./data/ascend.db`. The desktop app (Milestone 2) will set `ASCEND_DATA_DIR` to `~/Library/Application Support/ASCEND`.
+Development uses `./data/ascend.db`. The desktop app uses `~/Library/Application Support/ASCEND`. They are separate databases.

@@ -1,11 +1,46 @@
 @import "tailwindcss";
 
-:root {
-  color-scheme: dark;
+@theme {
+  --color-bg: #0e1014;
+  --color-surface: #151821;
+  --color-surface-2: #1b1f2a;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-ink: #e7e9ee;
+  --color-muted: #9aa1b2;
+  --color-faint: #6b7283;
+  --color-accent: #7c9cff;
+  --color-good: #5fcf9f;
+  --color-warn: #e0a458;
+  --color-bad: #e07070;
+  --color-gold: #e6c36a;
+  --color-silver: #c9d1dc;
+  --color-bronze: #d08b57;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+  --animate-rise: rise 0.35s ease-out both;
+  --animate-pop: pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  --animate-glow: glow 1.6s ease-out both;
 }
 
-body {
-  background: #0f1115;
-  color: #e6e8ee;
-  font-feature-settings: "tnum";
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
+@keyframes pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes glow {
+  0% { box-shadow: 0 0 0 0 rgb(124 156 255 / 0.55); }
+  100% { box-shadow: 0 0 0 18px rgb(124 156 255 / 0); }
+}
+
+:root { color-scheme: dark; }
+html, body { background: var(--color-bg); color: var(--color-ink); }
+body { font-family: var(--font-sans); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+::selection { background: rgb(124 156 255 / 0.35); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+.drag { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }

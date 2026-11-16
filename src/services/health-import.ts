@@ -379,7 +379,16 @@ export function importHealthJson(db: DB, text: string, fileName: string | null, 
     throw ValidationError.one("file", "That file isn't valid JSON");
   }
   const workouts = parseHealthExport(json);
-  return { found: workouts.length, ...ingestWorkouts(db, workouts, fileName, now) };
+  return { found: workouts.length, metricsOnly: workouts.length === 0 && isMetricsOnly(json), ...ingestWorkouts(db, workouts, fileName, now) };
+}
+
+export const METRICS_ONLY_HINT =
+  "These files have health metrics (steps, heart rate) but no workouts. In Health Auto Export, edit the automation and set its data type to Workouts.";
+
+/** A Health Auto Export file of metrics, with no workouts section: the automation's data type is wrong. */
+function isMetricsOnly(json: unknown): boolean {
+  const data = (json as { data?: Record<string, unknown> })?.data;
+  return !!data && Array.isArray(data.metrics) && !("workouts" in data);
 }
 
 /** Scans the chosen folder for new or changed export files. Safe to call often. */
@@ -390,6 +399,9 @@ export function scanHealthFolder(db: DB, now = Date.now()) {
   let added = 0;
   let error: string | null = null;
   let waiting = 0;
+  let filesRead = 0;
+  let found = 0;
+  let metricsOnly = 0;
   try {
     if (!fs.existsSync(folder)) throw new Error("The folder can't be found. Choose it again in Settings.");
     const { files, placeholders } = listJson(folder);
@@ -399,6 +411,9 @@ export function scanHealthFolder(db: DB, now = Date.now()) {
       if (seen[f] === st.mtimeMs || st.size > MAX_FILE_BYTES) continue;
       try {
         const r = importHealthJson(db, fs.readFileSync(f, "utf8"), path.basename(f), now);
+        filesRead++;
+        found += r.found;
+        if (r.metricsOnly) metricsOnly++;
         added += r.added;
         waiting = r.waiting;
         seen[f] = st.mtimeMs;
@@ -413,8 +428,11 @@ export function scanHealthFolder(db: DB, now = Date.now()) {
     error = (e as Error).message;
   }
   setSetting(db, "healthFiles", seen);
-  setSetting(db, "healthLastScan", { at: now, error, added });
-  return { added, error, waiting };
+  if (!error && filesRead && metricsOnly === filesRead) error = METRICS_ONLY_HINT;
+  // Keep showing the hint until a file with workouts arrives.
+  if (!error && !filesRead && getSetting(db, "healthLastScan")?.error === METRICS_ONLY_HINT) error = METRICS_ONLY_HINT;
+  setSetting(db, "healthLastScan", { at: now, error, added, files: filesRead, found });
+  return { added, error, waiting, files: filesRead, found };
 }
 
 /** Where Health Auto Export usually keeps its iCloud files on a Mac, if present. */

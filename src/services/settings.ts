@@ -11,7 +11,7 @@ export interface Settings {
   /** Files already read: path → modified time. */
   healthFiles: Record<string, number>;
   /** Last scan: when, and what went wrong if anything. */
-  healthLastScan: { at: number; error: string | null; added: number } | null;
+  healthLastScan: { at: number; error: string | null; added: number; files?: number; found?: number } | null;
   /** Monday (YYYY-MM-DD) of any Week 1. Rotation alternates every week from there. */
   weekAnchor: string | null;
   /** The pupil's private SOCS calendar feed (webcal:// or https://). Never in git. */

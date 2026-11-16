@@ -31,14 +31,15 @@ function session(): string {
   return sessionId;
 }
 
-export function track(kind: Kind, name: string, extra: { ms?: number; meta?: Meta } = {}): void {
+/** `path` defaults to the current page. Page views pass the page they measured. */
+export function track(kind: Kind, name: string, extra: { ms?: number; meta?: Meta; path?: string } = {}): void {
   if (typeof window === "undefined") return;
   queue.push({
     at: Date.now(),
     sessionId: session(),
     kind,
     name: name.replace(/\s+/g, " ").trim().slice(0, 80) || "(unnamed)",
-    path: routeOf(window.location.pathname),
+    path: extra.path ?? routeOf(window.location.pathname),
     ms: extra.ms == null ? null : Math.max(0, Math.round(extra.ms)),
     meta: extra.meta ?? null,
   });

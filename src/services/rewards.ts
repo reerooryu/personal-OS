@@ -20,9 +20,9 @@ interface Snapshot {
   medals: Set<string>;
 }
 
-function snapshot(db: DB): Snapshot {
+function snapshot(db: DB, now: number): Snapshot {
   const { character } = xpTotals(db);
-  const skills = skillSummaries(db);
+  const skills = skillSummaries(db, now);
   return {
     character,
     skillXp: new Map(skills.map((s) => [s.id, s.xp])),
@@ -45,10 +45,11 @@ export interface RewardSummary {
   medals: string[];
 }
 
-export function withReward<T>(db: DB, fn: () => T, focusActivityId?: (result: T) => string | null): { result: T; reward: RewardSummary } {
-  const before = snapshot(db);
+/** `now` is injectable so tests don't depend on which week the real clock is in. */
+export function withReward<T>(db: DB, fn: () => T, focusActivityId?: (result: T) => string | null, now = Date.now()): { result: T; reward: RewardSummary } {
+  const before = snapshot(db, now);
   const result = fn();
-  const after = snapshot(db);
+  const after = snapshot(db, now);
   const formula = currentFormula(db).params;
   const tree = loadSkillTree(db);
   const charBefore = levelFromXp(before.character, formula.characterCurve);
@@ -86,7 +87,7 @@ export function withReward<T>(db: DB, fn: () => T, focusActivityId?: (result: T)
   const focus = focusActivityId?.(result);
   if (focus) {
     const touched = new Set(db.select().from(t.questContributions).where(eq(t.questContributions.activityId, focus)).all().map((c) => c.questId));
-    for (const card of questBoard(db)) {
+    for (const card of questBoard(db, now)) {
       if (!touched.has(card.id) || card.state === "completed") continue;
       const r = card.requirements.find((x) => !x.met) ?? card.requirements[0];
       if (!r) continue;

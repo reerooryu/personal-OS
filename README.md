@@ -32,12 +32,13 @@ The Calendar page shows the school timetable (Week 1 and Week 2), tutoring, one-
 - **SOCS clubs** are read from the pupil's private SOCS calendar link every 30 minutes. The link is in the private timetable file, or can be pasted in **Settings → Calendar**.
 - **Lessons** are shown but never earn XP. **Tutoring, clubs and duties** show up under "Did you go?" when they end: one tap logs them. Admissions Office and the military training exam earn deliberately small XP toward Resilience.
 - **Holidays:** "School only" closures pause lessons and duties. "Everything" pauses tutoring too (Christmas). Both are set per break in Settings.
+- **Now line:** a red line marks the current time across today, like Apple Calendar. ← and → change week on the Calendar and Homework pages, T jumps back to this week.
 - **Week 1 / Week 2** alternate every calendar week from the anchor in the file. A Sunday counts as part of the week after it. If the school's rotation ever disagrees (after a holiday, say), use **Swap Week 1 and 2** in Settings.
 - **iPhone:** the timetable, tutoring and one-off events are written into a calendar called **ASCEND** in iCloud, eight weeks ahead, so they appear in Apple Calendar on the iPhone next to the SOCS events. The first sync asks for Calendar access. This needs the Swift compiler on the Mac when packaging (`xcode-select --install` if `npm run package` says it skipped the calendar helper). Because the app isn't signed with a developer certificate, macOS may ask for Calendar access again after a rebuild.
 
 ## Homework and tests
 
-- **Add homework:** title, subject, due, optional description. Picking the subject preselects its next lesson as the due time, and the list offers the next eight lessons. "Pick a date and time" covers anything else, such as 16:00.
+- **Add homework:** title, subject, due, optional description. Picking the subject preselects its next lesson as the due time, and the list offers its lessons for six weeks, grouped by week. "Another day or time" picks any day in the next ten weeks and a time from a list (school period times, every half hour, end of day). No typing.
 - **Homework page:** this week, Monday to Sunday, with each day's homework and tests. Overdue homework turns red and stays until it's done.
 - **Ticking off** asks how long it took. Picking a time logs it as study in that subject, which earns XP. "Just tick" logs nothing. Unticking offers to remove the logged time.
 - **Time Management** (the trait) is now the share of homework from the last 28 days that was done by its due time. It needs at least three pieces of homework.
@@ -52,7 +53,7 @@ Garmin watch → Garmin Connect → Apple Health → Health Auto Export → iClo
 2. Install **Health Auto Export** on the iPhone. Create an automation: type **Workouts**, format **JSON**, version **2**, destination **iCloud Drive**, daily. Automatic exports need its Premium tier. Without it, use **Export** by hand and AirDrop the file to the Mac.
 3. In ASCEND: **Settings → Apple Health → Choose folder**, and pick the folder the automation writes to in iCloud Drive. Or use **Import a file** for a file exported by hand.
 
-ASCEND checks the folder every 15 minutes and when the Mac wakes. Tennis, swimming, volleyball, strength and running workouts are logged by themselves. A new type (hiking, yoga) waits on the Overview until Ryu picks a skill or ignores it, with "Always" to make it a rule. A workout that overlaps a session already logged by hand on the same skill is matched to it, not counted twice. Effort comes from average heart rate (155+ Hard, 175+ Very hard). Rules can be changed in Settings.
+ASCEND checks the folder every 15 minutes and when the Mac wakes. If the files hold only health metrics (steps, heart rate), Settings says so: the automation's data type must be **Workouts**. Tennis, swimming, volleyball, strength and running workouts are logged by themselves. A new type (hiking, yoga) waits on the Overview until Ryu picks a skill or ignores it, with "Always" to make it a rule. A workout that overlaps a session already logged by hand on the same skill is matched to it, not counted twice. Effort comes from average heart rate (155+ Hard, 175+ Very hard). Rules can be changed in Settings.
 
 Strava isn't used: its API now needs a paid plan for apps like this, and its terms don't allow keeping the data.
 

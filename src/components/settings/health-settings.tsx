@@ -13,7 +13,7 @@ import { dateLabel, timeLabel } from "@/lib/utils";
 export interface HealthSettingsProps {
   folder: string | null;
   guess: string | null;
-  lastScan: { at: number; error: string | null; added: number } | null;
+  lastScan: { at: number; error: string | null; added: number; files?: number; found?: number } | null;
   stats: { total: number; imported: number; matched: number; ignored: number; pending: number; latest: number | null };
   rules: { workoutType: string; action: "log" | "ignore"; skillId: string | null; seen: number }[];
   skills: SkillChoice[];
@@ -99,7 +99,11 @@ export function HealthSettings({ folder, guess, lastScan, stats, rules, skills }
         {lastScan && (
           <p className={lastScan.error ? "text-xs text-warn" : "text-xs text-faint"}>
             Last checked {dateLabel(lastScan.at)}, {timeLabel(lastScan.at)}
-            {lastScan.error ? `. ${lastScan.error}` : lastScan.added ? `. Found ${lastScan.added} new.` : ". Nothing new."}
+            {lastScan.error
+              ? `. ${lastScan.error}`
+              : lastScan.files
+                ? `. Read ${lastScan.files} new or changed file${lastScan.files === 1 ? "" : "s"} with ${lastScan.found ?? 0} workout${lastScan.found === 1 ? "" : "s"}, ${lastScan.added} new.`
+                : ". No new files."}
           </p>
         )}
       </div>

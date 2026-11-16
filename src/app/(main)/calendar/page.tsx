@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DidYouGo } from "@/components/calendar/did-you-go";
 import { FeedRefresher } from "@/components/calendar/feed-refresher";
 import { Legend, WeekGrid } from "@/components/calendar/week-grid";
+import { WeekKeys } from "@/components/calendar/week-keys";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Empty, PageHeader } from "@/components/views/bits";
@@ -66,16 +67,17 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             </div>
             <Legend />
           </div>
+          <WeekKeys prev={nav(addDays(w.monday, -7))} next={nav(addDays(w.monday, 7))} today="/calendar" />
           <WeekGrid days={w.days} items={w.items} today={today} />
           <p className="mt-3 text-xs text-faint">
             {feed
               ? last?.error
-                ? `School calendar: ${last.error}`
+                ? `School calendar: ${last.error}.`
                 : last
                   ? `School calendar updated ${dateLabel(last.at)}, ${timeLabel(last.at)}.`
                   : "School calendar not read yet."
               : "School calendar not connected. Add the SOCS link in Settings."}{" "}
-            Week 1 and Week 2 can be swapped in Settings if the rotation is ever off.
+            Use ← and → to change week, T for this week.
           </p>
         </>
       )}

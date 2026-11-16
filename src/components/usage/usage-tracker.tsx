@@ -49,7 +49,7 @@ export function UsageTracker() {
     const prev = entered.current;
     // Under 300 ms is a redirect or a dev-mode double mount, not a visit.
     if (prev && now - prev.at >= 300) {
-      track("view", prev.path, { ms: now - prev.at });
+      track("view", prev.path, { ms: now - prev.at, path: prev.path });
       abandonForms(true);
     }
     entered.current = { path: routeOf(pathname), at: now };
@@ -87,7 +87,7 @@ export function UsageTracker() {
     };
     const onLeave = () => {
       const prev = entered.current;
-      if (prev) track("view", prev.path, { ms: Date.now() - prev.at });
+      if (prev) track("view", prev.path, { ms: Date.now() - prev.at, path: prev.path });
       entered.current = null;
       abandonForms(true);
       flushUsage(true);

@@ -29,6 +29,7 @@ import {
   decideImport,
   deleteImportRule,
   importHealthJson,
+  METRICS_ONLY_HINT,
   returnToReview,
   scanHealthFolder,
   setImportRule,
@@ -415,7 +416,7 @@ export async function uploadHealthFileAction(form: FormData): Promise<ScanResult
     if (f.size > 50 * 1024 * 1024) return { ok: false, error: "That file is over 50 MB. Export a shorter date range." };
     const r = importHealthJson(appDb(), await f.text(), f.name);
     done();
-    if (!r.found) return { ok: false, error: "No workouts in that file. Export workouts as JSON from Health Auto Export." };
+    if (!r.found) return { ok: false, error: r.metricsOnly ? METRICS_ONLY_HINT : "No workouts in that file. Export workouts as JSON from Health Auto Export." };
     return { ok: true, added: r.added, message: r.added ? `Found ${r.added} new workout${r.added === 1 ? "" : "s"}.` : "Those workouts were already imported." };
   } catch (e) {
     return fail(e);

@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { WeekKeys } from "@/components/calendar/week-keys";
 import { AddButtons, HomeworkRow, TestRow } from "@/components/schoolwork/schoolwork";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -87,6 +88,7 @@ export default async function HomeworkPage({ searchParams }: { searchParams: Pro
         )}
       </div>
 
+      <WeekKeys prev={`/homework?date=${addDays(monday, -7)}`} next={`/homework?date=${addDays(monday, 7)}`} today="/homework" />
       <div className="overflow-x-auto">
         <div className="grid min-w-[900px] grid-cols-7 gap-2">
           {days.map((d) => {

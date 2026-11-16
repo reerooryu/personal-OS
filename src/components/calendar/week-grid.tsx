@@ -4,11 +4,13 @@
  */
 import { Check, X } from "lucide-react";
 import type { Occurrence } from "@/services/calendar";
+import { NowLine } from "./now-line";
 import { cn, timeLabel } from "@/lib/utils";
 
 const START_H = 7;
 const END_H = 23;
 const PX_PER_MIN = 0.8;
+const GUTTER = 52;
 const TZ = "Asia/Bangkok";
 
 const STYLE: Record<Occurrence["kind"], string> = {
@@ -30,12 +32,25 @@ export const KIND_NAMES: Record<Occurrence["kind"], string> = {
 };
 
 function minutesOfDay(ms: number): number {
-  const p = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
-  return Number(p.find((x) => x.type === "hour")!.value) * 60 + Number(p.find((x) => x.type === "minute")!.value);
+  const p = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(ms));
+  return (
+    Number(p.find((x) => x.type === "hour")!.value) * 60 +
+    Number(p.find((x) => x.type === "minute")!.value)
+  );
 }
 
 function dateOf(ms: number): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms));
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
 }
 
 /** Side-by-side lanes, only within groups of items that actually overlap. */
@@ -61,75 +76,156 @@ function lanes(items: Occurrence[]) {
   return out;
 }
 
-export function WeekGrid({ days, items, today }: { days: { date: string; break: string | null; week: 1 | 2 | null; due: number }[]; items: Occurrence[]; today: string }) {
+export function WeekGrid({
+  days,
+  items,
+  today,
+}: {
+  days: {
+    date: string;
+    break: string | null;
+    week: 1 | 2 | null;
+    due: number;
+  }[];
+  items: Occurrence[];
+  today: string;
+}) {
   const height = (END_H - START_H) * 60 * PX_PER_MIN;
   const label = (d: string) => {
     const dt = new Date(`${d}T12:00:00Z`);
-    return { wd: dt.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }), day: dt.getUTCDate() };
+    return {
+      wd: dt.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }),
+      day: dt.getUTCDate(),
+    };
   };
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-      <div className="grid min-w-[860px] grid-cols-[52px_repeat(7,1fr)]">
-        <div className="border-b border-line" />
-        {days.map((d) => {
-          const l = label(d.date);
-          return (
-            <div key={d.date} className={cn("border-b border-l border-line px-2 py-2", d.date === today && "bg-accent/[0.07]")}>
-              <p className={cn("text-xs", d.date === today ? "text-accent" : "text-muted")}>{l.wd}</p>
-              <p className="text-lg font-semibold leading-tight">{l.day}</p>
-              <p className="h-4 truncate text-[11px] text-warn">{d.break ?? (d.week ? <span className="text-faint">Week {d.week}</span> : "")}</p>
-              <p className="h-4 truncate text-[11px] text-accent">{d.due ? `${d.due} homework due` : ""}</p>
-            </div>
-          );
-        })}
-
-        <div className="relative" style={{ height }}>
-          {Array.from({ length: END_H - START_H }, (_, i) => (
-            <span key={i} className="absolute right-2 -translate-y-1/2 text-[10px] text-faint" style={{ top: i * 60 * PX_PER_MIN }}>
-              {i === 0 ? "" : `${String(START_H + i).padStart(2, "0")}:00`}
-            </span>
-          ))}
+      <div className="min-w-[860px]">
+        <div className="grid grid-cols-[52px_repeat(7,1fr)]">
+          <div className="border-b border-line" />
+          {days.map((d) => {
+            const l = label(d.date);
+            return (
+              <div
+                key={d.date}
+                className={cn(
+                  "border-b border-l border-line px-2 py-2",
+                  d.date === today && "bg-accent/[0.07]",
+                )}
+              >
+                <p
+                  className={cn(
+                    "text-xs",
+                    d.date === today ? "text-accent" : "text-muted",
+                  )}
+                >
+                  {l.wd}
+                </p>
+                <p className="text-lg font-semibold leading-tight">{l.day}</p>
+                <p className="h-4 truncate text-[11px] text-warn">
+                  {d.break ??
+                    (d.week ? (
+                      <span className="text-faint">Week {d.week}</span>
+                    ) : (
+                      ""
+                    ))}
+                </p>
+                <p className="h-4 truncate text-[11px] text-accent">
+                  {d.due ? `${d.due} homework due` : ""}
+                </p>
+              </div>
+            );
+          })}
         </div>
-        {days.map((d) => {
-          const dayItems = items.filter((o) => !o.allDay && dateOf(o.startAt) === d.date);
-          const placed = lanes(dayItems);
-          return (
-            <div key={d.date} className={cn("relative border-l border-line", d.break && "bg-white/[0.015]")} style={{ height }}>
-              {Array.from({ length: END_H - START_H }, (_, i) => (
-                <div key={i} className="absolute inset-x-0 border-t border-line/50" style={{ top: i * 60 * PX_PER_MIN }} />
-              ))}
-              {placed.map(({ o, lane, count }) => {
-                const top = Math.max(0, (minutesOfDay(o.startAt) - START_H * 60) * PX_PER_MIN);
-                const h = Math.max(18, ((o.endAt - o.startAt) / 60_000) * PX_PER_MIN - 2);
-                return (
+
+        <div className="relative grid grid-cols-[52px_repeat(7,1fr)]">
+          <NowLine
+            days={days.map((d) => d.date)}
+            startH={START_H}
+            endH={END_H}
+            pxPerMin={PX_PER_MIN}
+            gutter={GUTTER}
+          />
+          <div className="relative" style={{ height }}>
+            {Array.from({ length: END_H - START_H }, (_, i) => (
+              <span
+                key={i}
+                className="absolute right-2 -translate-y-1/2 text-[10px] text-faint"
+                style={{ top: i * 60 * PX_PER_MIN }}
+              >
+                {i === 0 ? "" : `${((START_H + i) % 12) || 12} ${START_H + i < 12 ? "AM" : "PM"}`}
+              </span>
+            ))}
+          </div>
+          {days.map((d) => {
+            const dayItems = items.filter(
+              (o) => !o.allDay && dateOf(o.startAt) === d.date,
+            );
+            const placed = lanes(dayItems);
+            return (
+              <div
+                key={d.date}
+                className={cn(
+                  "relative border-l border-line",
+                  d.break && "bg-white/[0.015]",
+                )}
+                style={{ height }}
+              >
+                {Array.from({ length: END_H - START_H }, (_, i) => (
                   <div
-                    key={o.key}
-                    title={`${o.title}${o.location ? ` · ${o.location}` : ""}\n${timeLabel(o.startAt)}–${timeLabel(o.endAt)} · ${KIND_NAMES[o.kind]}${o.cancelled ? " · cancelled" : ""}`}
-                    className={cn(
-                      "absolute overflow-hidden rounded-md border px-1.5 py-0.5 text-[11px] leading-tight",
-                      STYLE[o.kind],
-                      o.cancelled && "line-through opacity-50",
-                      o.status === "skipped" && "opacity-40",
-                    )}
-                    style={{ top, height: h, left: `calc(${(lane / count) * 100}% + 2px)`, width: `calc(${100 / count}% - 4px)` }}
-                  >
-                    <p className="flex items-center gap-1 truncate font-medium">
-                      {o.status === "done" && <Check className="size-3 shrink-0 text-good" />}
-                      {o.status === "skipped" && <X className="size-3 shrink-0" />}
-                      <span className="truncate">{o.title}</span>
-                    </p>
-                    {h > 30 && (
-                      <p className="truncate opacity-80">
-                        {timeLabel(o.startAt)}
-                        {o.location ? ` · ${o.location}` : ""}
+                    key={i}
+                    className="absolute inset-x-0 border-t border-line/50"
+                    style={{ top: i * 60 * PX_PER_MIN }}
+                  />
+                ))}
+                {placed.map(({ o, lane, count }) => {
+                  const top = Math.max(
+                    0,
+                    (minutesOfDay(o.startAt) - START_H * 60) * PX_PER_MIN,
+                  );
+                  const h = Math.max(
+                    18,
+                    ((o.endAt - o.startAt) / 60_000) * PX_PER_MIN - 2,
+                  );
+                  return (
+                    <div
+                      key={o.key}
+                      title={`${o.title}${o.location ? ` · ${o.location}` : ""}\n${timeLabel(o.startAt)}–${timeLabel(o.endAt)} · ${KIND_NAMES[o.kind]}${o.cancelled ? " · cancelled" : ""}`}
+                      className={cn(
+                        "absolute overflow-hidden rounded-md border px-1.5 py-0.5 text-[11px] leading-tight",
+                        STYLE[o.kind],
+                        o.cancelled && "line-through opacity-50",
+                        o.status === "skipped" && "opacity-40",
+                      )}
+                      style={{
+                        top,
+                        height: h,
+                        left: `calc(${(lane / count) * 100}% + 2px)`,
+                        width: `calc(${100 / count}% - 4px)`,
+                      }}
+                    >
+                      <p className="flex items-center gap-1 truncate font-medium">
+                        {o.status === "done" && (
+                          <Check className="size-3 shrink-0 text-good" />
+                        )}
+                        {o.status === "skipped" && (
+                          <X className="size-3 shrink-0" />
+                        )}
+                        <span className="truncate">{o.title}</span>
                       </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+                      {h > 30 && (
+                        <p className="truncate opacity-80">
+                          {timeLabel(o.startAt)}
+                          {o.location ? ` · ${o.location}` : ""}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

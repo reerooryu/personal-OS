@@ -175,6 +175,13 @@ describe("Apple Health import", () => {
     expect(scanHealthFolder(db, NOW)).toMatchObject({ added: 0 });
     fs.writeFileSync(path.join(dir, "Workouts", "b.json"), file(workout("Pool Swim", NOW - 2 * H, 40)));
     expect(scanHealthFolder(db, NOW)).toMatchObject({ added: 1 });
+    // A metrics export (the automation's data type set wrong) says so instead of "nothing new".
+    const only = fs.mkdtempSync(path.join(os.tmpdir(), "ascend-metrics-"));
+    fs.writeFileSync(path.join(only, "HealthAutoExport-2026-46.json"), JSON.stringify({ data: { metrics: [{ name: "step_count", units: "count", data: [] }] } }));
+    setSetting(db, "healthFolder", only);
+    expect((scanHealthFolder(db, NOW) as { error: string }).error).toMatch(/data type to Workouts/);
+    expect((scanHealthFolder(db, NOW) as { error: string }).error).toMatch(/data type to Workouts/); // still shown with no new files
+    fs.rmSync(only, { recursive: true });
     setSetting(db, "healthFolder", path.join(dir, "gone"));
     expect((scanHealthFolder(db, NOW) as { error: string }).error).toMatch(/can't be found/);
     fs.rmSync(dir, { recursive: true });

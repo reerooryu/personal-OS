@@ -21,10 +21,10 @@ import { useReward } from "@/components/reward/reward-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
-import { fromLocalInput, toLocalInput } from "@/lib/local-time";
+import { fromLocalInput, toLocalDate, toLocalInput } from "@/lib/local-time";
 import { cn, dateLabel, minutesLabel, timeLabel } from "@/lib/utils";
 
-export type LessonChoices = Record<string, { startAt: number; endAt: number; location: string | null }[]>;
+export type LessonChoices = Record<string, { startAt: number; endAt: number; location: string | null; week: 1 | 2 | null }[]>;
 
 export interface HomeworkItem {
   id: string;
@@ -73,11 +73,67 @@ export function countdown(ms: number, now: number) {
 // ------------------------------------------------------------ due picker ---
 
 const CUSTOM = "custom";
+const DAY = 86_400_000;
 
-function DuePicker({ lessons, value, onChange, label }: { lessons: LessonChoices[string]; value: { at: number; lessonEnd?: number } | null; onChange: (v: { at: number; lessonEnd?: number } | null) => void; label: string }) {
+/** Times offered for "another day or time": every half hour, the school's period times, and end of day. */
+const TIMES = [
+  ...new Set([
+    ...Array.from({ length: 36 }, (_, i) => 360 + i * 30),
+    ...[470, 530, 585, 605, 660, 665, 720, 770, 825, 830, 885, 900, 955].values(),
+    1439,
+  ]),
+].sort((a, b) => a - b);
+
+const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const timeName = (m: number) => {
+  const h = Math.floor(m / 60);
+  const label = `${h % 12 || 12}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  return m === 1439 ? `${label} (end of day)` : label;
+};
+const dayName = (key: string) => new Date(`${key}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+const addDayKey = (key: string, n: number) => new Date(Date.parse(`${key}T12:00:00Z`) + n * DAY).toISOString().slice(0, 10);
+const mondayKey = (key: string) => addDayKey(key, -((new Date(`${key}T12:00:00Z`).getUTCDay() + 6) % 7));
+
+/** "This week", "Next week", "Week of Nov 30", for grouping long lists. */
+function weekGroup(key: string, todayKey: string) {
+  const diff = Math.round((Date.parse(mondayKey(key)) - Date.parse(mondayKey(todayKey))) / (7 * DAY));
+  return diff === 0 ? "This week" : diff === 1 ? "Next week" : `Week of ${dayName(mondayKey(key)).replace(/^\w+, /, "")}`;
+}
+
+/**
+ * Due-date picker without typing: the subject's lessons for six weeks, grouped
+ * by week, or another day and time from two dropdowns.
+ */
+function DuePicker({
+  lessons,
+  value,
+  onChange,
+  label,
+}: {
+  lessons: LessonChoices[string];
+  value: { at: number; lessonEnd?: number } | null;
+  onChange: (v: { at: number; lessonEnd?: number } | null) => void;
+  label: string;
+}) {
   const match = value ? lessons.find((l) => l.startAt === value.at) : undefined;
   const [custom, setCustom] = React.useState(!!value && !match);
+  const [today] = React.useState(() => toLocalDate(Date.now()));
   const selectValue = custom ? CUSTOM : match ? String(match.startAt) : "";
+
+  const groups = new Map<string, LessonChoices[string]>();
+  for (const l of lessons) {
+    const g = `${weekGroup(toLocalDate(l.startAt), today)}${l.week ? ` · Week ${l.week}` : ""}`;
+    groups.set(g, [...(groups.get(g) ?? []), l]);
+  }
+
+  // Custom day and time, from the current value or tomorrow at 4 PM.
+  const current = value && !match ? toLocalInput(value.at) : null;
+  const dayValue = current?.slice(0, 10) ?? addDayKey(today, 1);
+  const [h, m] = (current?.slice(11, 16) ?? "16:00").split(":").map(Number);
+  const timeValue = h! * 60 + m!;
+  const days = Array.from({ length: 70 }, (_, i) => addDayKey(today, i));
+  const setCustomValue = (day: string, minutes: number) => onChange({ at: fromLocalInput(`${day}T${hhmm(minutes)}`) });
+
   return (
     <div className="space-y-2">
       <Select
@@ -86,6 +142,7 @@ function DuePicker({ lessons, value, onChange, label }: { lessons: LessonChoices
         onChange={(e) => {
           if (e.target.value === CUSTOM) {
             setCustom(true);
+            setCustomValue(dayValue, timeValue);
             return;
           }
           setCustom(false);
@@ -93,22 +150,45 @@ function DuePicker({ lessons, value, onChange, label }: { lessons: LessonChoices
           onChange(l ? { at: l.startAt, lessonEnd: l.endAt } : null);
         }}
       >
-        {!lessons.length && <option value="">No lessons in the next three weeks</option>}
-        {lessons.map((l) => (
-          <option key={l.startAt} value={l.startAt}>
-            Lesson: {dateLabel(l.startAt)}, {timeLabel(l.startAt)}
-            {l.location ? ` · ${l.location}` : ""}
-          </option>
+        {!lessons.length && <option value="">No lessons in the next six weeks</option>}
+        {[...groups].map(([g, ls]) => (
+          <optgroup key={g} label={g}>
+            {ls.map((l) => (
+              <option key={l.startAt} value={l.startAt}>
+                Lesson: {dateLabel(l.startAt)}, {timeLabel(l.startAt)}
+                {l.location ? ` · ${l.location}` : ""}
+              </option>
+            ))}
+          </optgroup>
         ))}
-        <option value={CUSTOM}>Pick a date and time…</option>
+        <option value={CUSTOM}>Another day or time…</option>
       </Select>
       {custom && (
-        <Input
-          type="datetime-local"
-          aria-label={`${label}: date and time`}
-          value={value ? toLocalInput(value.at) : ""}
-          onChange={(e) => onChange(e.target.value ? { at: fromLocalInput(e.target.value) } : null)}
-        />
+        <div className="grid grid-cols-[1fr_170px] gap-2">
+          <Select value={dayValue} onChange={(e) => setCustomValue(e.target.value, timeValue)} aria-label={`${label}: day`}>
+            {[...new Set(days.map((d) => weekGroup(d, today)))].map((g) => (
+              <optgroup key={g} label={g}>
+                {days
+                  .filter((d) => weekGroup(d, today) === g)
+                  .map((d) => (
+                    <option key={d} value={d}>
+                      {d === today ? `Today (${dayName(d)})` : d === addDayKey(today, 1) ? `Tomorrow (${dayName(d)})` : dayName(d)}
+                    </option>
+                  ))}
+              </optgroup>
+            ))}
+            {!days.includes(dayValue) && <option value={dayValue}>{dayName(dayValue)}</option>}
+          </Select>
+          <Select value={timeValue} onChange={(e) => setCustomValue(dayValue, Number(e.target.value))} aria-label={`${label}: time`}>
+            {[...new Set([...TIMES, timeValue])]
+              .sort((a, b) => a - b)
+              .map((t) => (
+                <option key={t} value={t}>
+                  {timeName(t)}
+                </option>
+              ))}
+          </Select>
+        </div>
       )}
     </div>
   );

@@ -173,17 +173,16 @@ export function setNoResult(db: DB, id: string) {
 // ------------------------------------------------------------------ views ---
 
 /**
- * Due-date choices for a subject: its next lessons from the timetable, so
- * "due next Maths lesson" is one pick. Three weeks ahead.
+ * Due-date choices for a subject: its lessons over the next six weeks, so
+ * "due next Maths lesson" is one pick and later lessons are a scroll away.
  */
 export function lessonChoices(db: DB, now = Date.now()) {
   const today = todayKey(db, now);
-  const out: Record<string, { startAt: number; endAt: number; location: string | null }[]> = {};
-  for (const o of occurrences(db, today, addDays(today, 21))) {
+  const out: Record<string, { startAt: number; endAt: number; location: string | null; week: 1 | 2 | null }[]> = {};
+  for (const o of occurrences(db, today, addDays(today, 42))) {
     if (o.kind !== "lesson" || !o.skillId || o.startAt < now) continue;
-    (out[o.skillId] ??= []).push({ startAt: o.startAt, endAt: o.endAt, location: o.location });
+    (out[o.skillId] ??= []).push({ startAt: o.startAt, endAt: o.endAt, location: o.location, week: o.week });
   }
-  for (const k of Object.keys(out)) out[k] = out[k]!.slice(0, 8);
   return out;
 }
 

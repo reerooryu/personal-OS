@@ -13,7 +13,7 @@ import { NOW, bkk, piano, seededDb, skillXp } from "./helpers";
 describe("reward summary", () => {
   it("describes exactly what one log moved", () => {
     const db = seededDb();
-    const { reward } = withReward(db, () => createActivity(db, piano(20, bkk(2026, 11, 15, 17)), NOW), (r) => r.activity.id);
+    const { reward } = withReward(db, () => createActivity(db, piano(20, bkk(2026, 11, 15, 17)), NOW), (r) => r.activity.id, NOW);
     expect(reward.xp).toBe(30); // 20 + daily quest reward 10
     expect(reward.questsCompleted).toEqual(["Practice piano for 20 minutes"]);
     expect(reward.skills[0]).toMatchObject({ id: "piano", gained: 30 });

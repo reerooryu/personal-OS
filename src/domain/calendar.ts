@@ -22,8 +22,10 @@ export function mondayOf(dateKey: string): string {
  * anchor (the Monday of any Week 1). A Sunday belongs to the week that
  * follows it: "Week 2 Sunday" is the Sunday before a Week 2 school week.
  */
-export function rotationWeek(dateKey: string, anchorMonday: string): 1 | 2 {
+export function rotationWeek(dateKey: string, anchor: string): 1 | 2 {
   const d = weekdayOf(dateKey) === 7 ? addDays(dateKey, 1) : dateKey;
+  // Any day of the anchor's school week works: count from that week's Monday.
+  const anchorMonday = mondayOf(weekdayOf(anchor) === 7 ? addDays(anchor, 1) : anchor);
   const weeks = Math.round(daysBetween(anchorMonday, mondayOf(d)) / 7);
   return ((weeks % 2) + 2) % 2 === 0 ? 1 : 2;
 }

@@ -334,6 +334,8 @@ function overlapping(db: DB, o: Occurrence, skillId: string) {
 export function answerCalendar(db: DB, ans: CalendarAnswer, now = Date.now()) {
   const o = find(db, ans.key, now);
   if (o.startAt > now) throw ValidationError.one("key", "That session hasn't happened yet");
+  if (o.cancelled) throw ValidationError.one("key", "That session was cancelled");
+  if (o.xp === "none" && !o.needsSkill && ans.answer !== "never") throw ValidationError.one("key", "Lessons and untracked sessions aren't logged");
   const titleKey = o.title.toLowerCase().replace(/\s+/g, " ");
   if (ans.answer === "never") {
     if (o.source !== "feed") throw ValidationError.one("answer", "Only school events can be untracked");

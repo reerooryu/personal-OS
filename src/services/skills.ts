@@ -92,6 +92,15 @@ export function deleteSkill(db: DB, id: string) {
       tx.select().from(t.questSkills).where(eq(t.questSkills.skillId, id)).get() ??
       tx.select().from(t.medalSkills).where(eq(t.medalSkills.skillId, id)).get();
     if (used) throw ValidationError.one("id", "This skill has history or subskills. Archive it instead.");
+    const planned =
+      tx.select().from(t.homework).where(eq(t.homework.skillId, id)).get() ??
+      tx.select().from(t.tests).where(eq(t.tests.skillId, id)).get() ??
+      tx.select().from(t.timetableSlots).where(eq(t.timetableSlots.skillId, id)).get() ??
+      tx.select().from(t.calendarEvents).where(eq(t.calendarEvents.skillId, id)).get();
+    if (planned) throw ValidationError.one("id", "Homework, a test or the timetable uses this skill. Archive it instead.");
+    // Rules that pointed here would log into nothing: forget them, so the next session asks again.
+    tx.delete(t.calendarRules).where(eq(t.calendarRules.skillId, id)).run();
+    tx.delete(t.importRules).where(eq(t.importRules.skillId, id)).run();
     tx.delete(t.measurementTypes).where(eq(t.measurementTypes.skillId, id)).run();
     tx.delete(t.skills).where(eq(t.skills.id, id)).run();
   });

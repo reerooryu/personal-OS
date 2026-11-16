@@ -61,6 +61,16 @@ Strava isn't used: its API now needs a paid plan for apps like this, and its ter
 
 ASCEND records how it's used (pages opened, buttons clicked, dropdown choices, which fields were edited, how long logging takes, forms left unfinished, errors) so the app can be made easier to use. It never records what is typed. Ryu can see a summary, export it as CSV or JSON, clear it or switch it off in **Settings → Usage log**. Events older than a year are deleted.
 
+## Stress testing
+
+`npm test` includes a randomized test (`tests/stress/fuzz.test.ts`) that runs a seeded mix of every kind of write and checks after each batch that the stored totals match a full rebuild. For a heavy run:
+
+```
+FUZZ_STEPS=2000 FUZZ_SEEDS=8 FUZZ_CHECK=100 npx vitest run tests/stress
+```
+
+Measured on 16 Nov 2026 with three years of heavy use (about 4,400 activities): logging takes about 100 ms, pages load in 0.15 to 0.5 s, a full recalculation takes about 4 s, and a backup takes under 0.1 s. Server memory stays flat under repeated page loads.
+
 ## Development setup
 
 ```bash

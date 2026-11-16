@@ -35,6 +35,7 @@ export function openDb(file?: string): OpenedDb {
   const target = file ?? path.join(dataDir(), "ascend.db");
   if (target !== ":memory:") fs.mkdirSync(path.dirname(target), { recursive: true });
   const sqlite = new Database(target);
+  reuseStatements(sqlite);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
   sqlite.pragma("busy_timeout = 5000");
@@ -54,3 +55,34 @@ export function getOpenedDb(): OpenedDb {
 export function getDb(): DB {
   return getOpenedDb().db;
 }
+
+/**
+ * Reuses prepared statements by their SQL text.
+ *
+ * Drizzle prepares a fresh statement for every query, and better-sqlite3 keeps
+ * each one's native memory until garbage collection, which almost never runs
+ * here because the JavaScript heap stays small. Measured: about 3 KB per query
+ * that was never given back, so a server left running in the menu bar for
+ * weeks would grow into gigabytes. With reuse, memory stays flat.
+ *
+ * Safe because every query here is synchronous (all/get/run, never iterate),
+ * so a statement is finished before the next use. The output mode Drizzle may
+ * have switched on is reset each time.
+ */
+function reuseStatements(sqlite: Database.Database, max = 2000) {
+  const prepare = sqlite.prepare.bind(sqlite) as Database.Database["prepare"];
+  const cache = new Map<string, Database.Statement>();
+  sqlite.prepare = ((source: string) => {
+    let stmt = cache.get(source);
+    if (stmt) {
+      cache.delete(source); // move to the most-recent end
+      if (stmt.reader) stmt.raw(false).pluck(false).expand(false);
+    } else {
+      stmt = prepare(source);
+      if (cache.size >= max) cache.delete(cache.keys().next().value!);
+    }
+    cache.set(source, stmt);
+    return stmt;
+  }) as Database.Database["prepare"];
+}
+

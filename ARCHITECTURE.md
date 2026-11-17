@@ -97,6 +97,10 @@ Occurrences are never stored. They are expanded on read from the timetable slots
 
 The desktop app pulls `/api/calendar/outbox` and pipes it to `native/calendar-sync.swift` (EventKit), which makes the "ASCEND" calendar match the plan for the window, touching only events marked `ascend://event/…`.
 
+## One-time data fixes (`src/services/data-fixes.ts`)
+
+Data decisions that must also reach the database already on Ryu's Mac (folding Music Theory into Piano with `mergeSkill`, backfilling revision quests) run once at startup, after the daily backup, and are recorded in settings. Schema changes stay in drizzle migrations.
+
 ## Data location
 
 Development uses `./data/ascend.db`. The desktop app uses `~/Library/Application Support/ASCEND`. They are separate databases.

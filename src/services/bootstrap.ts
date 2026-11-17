@@ -13,6 +13,7 @@ import { syncTimetableFile } from "./calendar";
 import { getProfile } from "./context";
 import { importSchoolworkFromFile } from "./schoolwork";
 import { backupTo } from "./data";
+import { runDataFixes } from "./data-fixes";
 import { isSeeded } from "./queries";
 
 const KEEP_BACKUPS = 14;
@@ -37,13 +38,17 @@ export function appDb(): DB {
         const record = process.env.ASCEND_STARTING_RECORD ? loadStartingRecord(process.env.ASCEND_STARTING_RECORD) : null;
         seedDatabase(db, { sample: true, startingRecord: record });
       }
-      loadTimetable(db, process.env.ASCEND_TIMETABLE);
       try {
         dailyBackup();
       } catch (e) {
         console.error("Backup failed", e);
       }
+      // After the backup, so a copy from before any one-time change always exists.
+      const ran = runDataFixes(db);
+      if (ran.length) console.log(`Data fixes applied: ${ran.join(", ")}`);
+      loadTimetable(db, process.env.ASCEND_TIMETABLE);
     } else if (isSeeded(db)) {
+      runDataFixes(db);
       // Development: read the private timetable from the project folder.
       loadTimetable(db, path.join(process.cwd(), "private", "timetable.json"));
     }

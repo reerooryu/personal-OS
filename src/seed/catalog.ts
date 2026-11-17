@@ -52,8 +52,7 @@ export const SKILLS: SkillDef[] = [
   { id: "track", name: "Track", attributeId: "athletics", aliases: ["running", "run", "sprint", "sprints"], primary: "track-100m" },
   { id: "gym", name: "Gym", attributeId: "athletics", aliases: ["workout", "weights", "lifting"], primary: "gym-pushups" },
   { id: "volleyball", name: "Volleyball", attributeId: "athletics", aliases: ["vball", "volley"], primary: "volleyball-rubric" },
-  { id: "piano", name: "Piano", attributeId: "creative", primary: "piano-abrsm" },
-  { id: "music-theory", name: "Music Theory", attributeId: "creative", parentId: "piano", aliases: ["theory"], primary: "theory-abrsm" },
+  { id: "piano", name: "Piano", attributeId: "creative", aliases: ["music theory", "theory"], primary: "piano-abrsm" },
   { id: "discipline", name: "Discipline", attributeId: "personal-development", kind: "trait" },
   { id: "consistency", name: "Consistency", attributeId: "personal-development", kind: "trait" },
   { id: "time_management", name: "Time Management", attributeId: "personal-development", kind: "trait" },
@@ -111,7 +110,7 @@ export const MEASUREMENTS: MeasurementDef[] = [
     return [{ id: `${id}-gcse`, skillId: id, name: "GCSE reporting grade", valueKind: "grade", direction: "higher", gradeScale: GCSE, weight: 1 }, exam];
   }),
   { id: "piano-abrsm", skillId: "piano", name: "ABRSM performance grade", valueKind: "grade", direction: "higher", gradeScale: ABRSM, weight: 1 },
-  { id: "theory-abrsm", skillId: "music-theory", name: "ABRSM theory grade", valueKind: "grade", direction: "higher", gradeScale: ABRSM, weight: 1 },
+  { id: "theory-abrsm", skillId: "piano", name: "ABRSM theory grade", valueKind: "grade", direction: "higher", gradeScale: ABRSM, weight: 1 },
   { id: "swim-50-free", skillId: "swimming", name: "50 m freestyle", valueKind: "time", unit: "s", direction: "lower", anchorLow: 60, anchorHigh: 25, weight: 1 },
   { id: "track-100m", skillId: "track", name: "100 m sprint", valueKind: "time", unit: "s", direction: "lower", anchorLow: 18, anchorHigh: 10.5, weight: 1 },
   { id: "gym-pushups", skillId: "gym", name: "Most push-ups in one set", valueKind: "number", unit: "reps", direction: "higher", anchorLow: 0, anchorHigh: 60, weight: 1 },
@@ -139,7 +138,6 @@ export const TEMPLATES = [
   { id: "tpl-tennis", name: "Tennis", aliases: ["tennis"], activityTypeId: "training", difficulty: "normal", durationMin: 60, skills: [{ skillId: "tennis", weight: 100 }], pinned: false },
   { id: "tpl-robotics", name: "Robotics build", aliases: ["robotics", "vex"], activityTypeId: "project", difficulty: "normal", durationMin: 90, skills: [{ skillId: "robotics", weight: 70 }, { skillId: "programming", weight: 30 }], pinned: true },
   { id: "tpl-programming", name: "Programming", aliases: ["coding"], activityTypeId: "project", difficulty: "normal", durationMin: 60, skills: [{ skillId: "programming", weight: 100 }], pinned: false },
-  { id: "tpl-theory", name: "Music theory", aliases: ["theory"], activityTypeId: "study", difficulty: "normal", durationMin: 20, skills: [{ skillId: "music-theory", weight: 100 }], pinned: false },
 ];
 
 const academics = ACADEMIC_SKILLS.map(([id]) => id as string);

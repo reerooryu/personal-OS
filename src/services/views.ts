@@ -360,3 +360,34 @@ export function calendarInboxItems(db: DB, now = Date.now()) {
     small: o.xp === "small",
   }));
 }
+
+export interface RevisionStatus {
+  questId: string;
+  state: string;
+  reason: string | null;
+  minutes: { done: number; target: number };
+  days: { done: number; target: number } | null;
+}
+
+/** Attaches each test's revision-quest progress, for the test cards. */
+export function withRevision<T extends { revisionQuestId: string | null }>(db: DB, tests: T[], now = Date.now()): (T & { revision: RevisionStatus | null })[] {
+  if (!tests.some((x) => x.revisionQuestId)) return tests.map((x) => ({ ...x, revision: null }));
+  const cards = new Map(questBoard(db, now).map((c) => [c.id, c]));
+  const reasons = new Map(db.select({ id: t.quests.id, d: t.quests.description }).from(t.quests).all().map((q) => [q.id, q.d]));
+  return tests.map((x) => {
+    const c = x.revisionQuestId ? cards.get(x.revisionQuestId) : undefined;
+    if (!c) return { ...x, revision: null };
+    const dur = c.requirements.find((r) => r.type === "duration");
+    const days = c.requirements.find((r) => r.type === "distinct_days");
+    return {
+      ...x,
+      revision: {
+        questId: c.id,
+        state: c.state,
+        reason: reasons.get(c.id) ?? null,
+        minutes: { done: Math.round(Math.min(dur?.progress ?? 0, dur?.target ?? 0)), target: dur?.target ?? 0 },
+        days: days ? { done: Math.min(days.progress, days.target), target: days.target } : null,
+      },
+    };
+  });
+}

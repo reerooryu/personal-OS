@@ -123,7 +123,7 @@ export function seedSampleActivities(db: DB, now: number) {
     [-3, 20, "tpl-physics", 45],
     [-2, 17, "tpl-piano", 20],
     [-2, 18, "tpl-volleyball", 60, "hard"],
-    [-1, 17, "tpl-theory", 25],
+    [-1, 17, "tpl-piano", 25],
     [-1, 19, "tpl-maths", 60],
   ];
   const templates = new Map(db.select().from(t.activityTemplates).all().map((x) => [x.id, x]));

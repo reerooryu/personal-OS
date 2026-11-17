@@ -105,3 +105,94 @@ export function deleteSkill(db: DB, id: string) {
     tx.delete(t.skills).where(eq(t.skills.id, id)).run();
   });
 }
+
+type Weighted = { skillId: string; weight: number };
+
+/** Replaces `from` with `into` in a skill/weight list, adding weights where both appear. */
+function foldWeights(list: Weighted[], from: string, into: string): Weighted[] {
+  const out = new Map<string, number>();
+  for (const w of list) {
+    const id = w.skillId === from ? into : w.skillId;
+    out.set(id, Math.min(100, (out.get(id) ?? 0) + w.weight));
+  }
+  return [...out].map(([skillId, weight]) => ({ skillId, weight }));
+}
+
+/**
+ * Folds one skill into another: every activity, assessment, measurement,
+ * quest, medal, template, rule, timetable slot, homework and test that
+ * pointed at `from` points at `into`, subskills move across, the old name
+ * becomes an alias, and `from` is deleted. XP is then rebuilt from the
+ * activity history, so nothing is lost and nothing is counted twice.
+ * `into` keeps its own proficiency model, so a folded-in measurement (a
+ * theory grade, say) is kept as history without changing the grade.
+ */
+export function mergeSkill(db: DB, fromId: string, intoId: string) {
+  if (fromId === intoId) throw ValidationError.one("id", "A skill can't be merged into itself");
+  db.transaction((tx) => {
+    const from = tx.select().from(t.skills).where(eq(t.skills.id, fromId)).get();
+    const into = tx.select().from(t.skills).where(eq(t.skills.id, intoId)).get();
+    if (!from || !into) throw ValidationError.one("id", "Skill not found");
+    if (from.kind === "trait" || into.kind === "trait") throw ValidationError.one("id", "Traits can't be merged");
+
+    // Activities: merge into the existing row when an activity already has both skills.
+    for (const row of tx.select().from(t.activitySkills).where(eq(t.activitySkills.skillId, fromId)).all()) {
+      const both = tx.select().from(t.activitySkills).where(sql`${t.activitySkills.activityId} = ${row.activityId} and ${t.activitySkills.skillId} = ${intoId}`).get();
+      if (both) {
+        tx.update(t.activitySkills).set({ weight: Math.min(100, both.weight + row.weight) }).where(sql`${t.activitySkills.activityId} = ${row.activityId} and ${t.activitySkills.skillId} = ${intoId}`).run();
+        tx.delete(t.activitySkills).where(sql`${t.activitySkills.activityId} = ${row.activityId} and ${t.activitySkills.skillId} = ${fromId}`).run();
+      } else {
+        tx.update(t.activitySkills).set({ skillId: intoId }).where(sql`${t.activitySkills.activityId} = ${row.activityId} and ${t.activitySkills.skillId} = ${fromId}`).run();
+      }
+    }
+    // Quest and medal links: same rule.
+    for (const row of tx.select().from(t.questSkills).where(eq(t.questSkills.skillId, fromId)).all()) {
+      const both = tx.select().from(t.questSkills).where(sql`${t.questSkills.questId} = ${row.questId} and ${t.questSkills.skillId} = ${intoId}`).get();
+      if (both) tx.update(t.questSkills).set({ weight: Math.min(100, both.weight + row.weight) }).where(sql`${t.questSkills.questId} = ${row.questId} and ${t.questSkills.skillId} = ${intoId}`).run();
+      if (both) tx.delete(t.questSkills).where(sql`${t.questSkills.questId} = ${row.questId} and ${t.questSkills.skillId} = ${fromId}`).run();
+      else tx.update(t.questSkills).set({ skillId: intoId }).where(sql`${t.questSkills.questId} = ${row.questId} and ${t.questSkills.skillId} = ${fromId}`).run();
+    }
+    for (const row of tx.select().from(t.medalSkills).where(eq(t.medalSkills.skillId, fromId)).all()) {
+      const both = tx.select().from(t.medalSkills).where(sql`${t.medalSkills.medalId} = ${row.medalId} and ${t.medalSkills.skillId} = ${intoId}`).get();
+      if (both) tx.update(t.medalSkills).set({ weight: Math.min(100, both.weight + row.weight) }).where(sql`${t.medalSkills.medalId} = ${row.medalId} and ${t.medalSkills.skillId} = ${intoId}`).run();
+      if (both) tx.delete(t.medalSkills).where(sql`${t.medalSkills.medalId} = ${row.medalId} and ${t.medalSkills.skillId} = ${fromId}`).run();
+      else tx.update(t.medalSkills).set({ skillId: intoId }).where(sql`${t.medalSkills.medalId} = ${row.medalId} and ${t.medalSkills.skillId} = ${fromId}`).run();
+    }
+    // Skill lists stored as JSON.
+    for (const a of tx.select().from(t.medalAwards).all()) {
+      if (a.skillsOverride?.some((w) => w.skillId === fromId)) tx.update(t.medalAwards).set({ skillsOverride: foldWeights(a.skillsOverride, fromId, intoId) }).where(eq(t.medalAwards.id, a.id)).run();
+    }
+    for (const tpl of tx.select().from(t.activityTemplates).all()) {
+      if (tpl.skills.some((w) => w.skillId === fromId)) tx.update(t.activityTemplates).set({ skills: foldWeights(tpl.skills, fromId, intoId) }).where(eq(t.activityTemplates.id, tpl.id)).run();
+    }
+    for (const r of tx.select().from(t.questRequirements).all()) {
+      const ids = r.filter.skillIds;
+      if (ids?.includes(fromId)) tx.update(t.questRequirements).set({ filter: { ...r.filter, skillIds: [...new Set(ids.map((x) => (x === fromId ? intoId : x)))] } }).where(eq(t.questRequirements.id, r.id)).run();
+    }
+    for (const ach of tx.select().from(t.achievements).all()) {
+      const p = ach.params as { skillId?: string; skillIds?: string[] };
+      if (p.skillId === fromId || p.skillIds?.includes(fromId)) {
+        tx.update(t.achievements)
+          .set({ params: { ...p, ...(p.skillId === fromId ? { skillId: intoId } : {}), ...(p.skillIds ? { skillIds: [...new Set(p.skillIds.map((x) => (x === fromId ? intoId : x)))] } : {}) } })
+          .where(eq(t.achievements.id, ach.id))
+          .run();
+      }
+    }
+    // Plain skill columns.
+    tx.update(t.measurementTypes).set({ skillId: intoId }).where(eq(t.measurementTypes.skillId, fromId)).run();
+    tx.update(t.assessments).set({ skillId: intoId }).where(eq(t.assessments.skillId, fromId)).run();
+    tx.update(t.homework).set({ skillId: intoId }).where(eq(t.homework.skillId, fromId)).run();
+    tx.update(t.tests).set({ skillId: intoId }).where(eq(t.tests.skillId, fromId)).run();
+    tx.update(t.timetableSlots).set({ skillId: intoId }).where(eq(t.timetableSlots.skillId, fromId)).run();
+    tx.update(t.calendarEvents).set({ skillId: intoId }).where(eq(t.calendarEvents.skillId, fromId)).run();
+    tx.update(t.calendarRules).set({ skillId: intoId }).where(eq(t.calendarRules.skillId, fromId)).run();
+    tx.update(t.importRules).set({ skillId: intoId }).where(eq(t.importRules.skillId, fromId)).run();
+    tx.update(t.skills).set({ parentId: intoId }).where(eq(t.skills.parentId, fromId)).run();
+
+    // The old name keeps working in pickers and feed matching.
+    const aliases = [...new Set([...(into.aliases ?? []), from.name.toLowerCase(), ...(from.aliases ?? [])])].filter((a) => a !== into.name.toLowerCase());
+    tx.update(t.skills).set({ aliases }).where(eq(t.skills.id, intoId)).run();
+    tx.delete(t.skills).where(eq(t.skills.id, fromId)).run();
+    reconcileAll(tx);
+  });
+}

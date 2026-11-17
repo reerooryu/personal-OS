@@ -43,6 +43,7 @@ The Calendar page shows the school timetable (Week 1 and Week 2), tutoring, one-
 - **Ticking off** asks how long it took. Picking a time logs it as study in that subject, which earns XP. "Just tick" logs nothing. Unticking offers to remove the logged time.
 - **Time Management** (the trait) is now the share of homework from the last 28 days that was done by its due time. It needs at least three pieces of homework.
 - **Tests** (quiz, test, mock, exam) use the same date picker. They replace the lesson on the calendar and on the iPhone, count down on the Overview, and afterwards ask for the result ("38 out of 40"), which is saved as that subject's test percentage in Statistics.
+- **Revision quests:** every upcoming test gets a quest sized from the subject's current grade and recent test results. Strong and steady means a light plan (an S-grade test: 60 minutes over 2 days). A subject that is slipping (the last test 8 or more points below the ones before, or 15 below the grade's level) gets 50% more time and an extra day. Quizzes get half, mocks and exams more. The plan fits the days left (at most 90 minutes a day), is fixed when the test is added or edited, and counts study sessions and homework time in that subject. The test card shows its progress, and the quest's description says why it's that size. Completing it pays its minutes as bonus XP.
 - Homework and tests can also be listed in `private/timetable.json` (see the example). Each is added once. After that it belongs to the app.
 
 ## Garmin workouts (Apple Health)
@@ -129,7 +130,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md). In short: activities, assessments and ot
 - Dropdown logger replaces typed entry everywhere (Overview, Activities, the L dialog, the ⌥⇧L window)
 - Apple Health workout import for the Garmin watch, with a review list and per-type rules
 - Usage log with a friction summary and CSV/JSON export
-- 124 tests
+- 144 tests, including a randomized stress test
+- Revision quests for tests, sized by grade and trend
+- Music Theory folded into Piano (17 Nov 2026): its history and the Grade 5 certificate now sit under Piano
 
 ## Implemented in Milestone 1
 

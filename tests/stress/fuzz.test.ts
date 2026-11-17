@@ -42,7 +42,7 @@ function rng(seed: number) {
   };
 }
 
-const SKILLS = ["piano", "mathematics", "physics", "chemistry", "biology", "economics", "tennis", "swimming", "track", "gym", "volleyball", "robotics", "programming", "resilience", "music-theory", "english"];
+const SKILLS = ["piano", "mathematics", "physics", "chemistry", "biology", "economics", "tennis", "swimming", "track", "gym", "volleyball", "robotics", "programming", "resilience", "geography", "english"];
 const ACADEMIC = ["mathematics", "physics", "chemistry", "biology", "economics", "english", "geography"];
 const TYPES = ["practice", "study", "training", "lesson", "project", "light", "competition", "exam"];
 const DIFFS = ["very_easy", "easy", "normal", "hard", "very_hard"] as const;
@@ -188,7 +188,7 @@ function run(seed: number) {
       if (r.chance(0.8)) stopTimer(db, { now, confirmLong: true });
     }],
     [1, "archive skill", () => {
-      setSkillArchived(db, r.pick(["volleyball", "economics", "music-theory"]), r.chance(0.5));
+      setSkillArchived(db, r.pick(["volleyball", "economics", "geography"]), r.chance(0.5));
     }],
     [1, "recalculate all", () => {
       recalculateAll(db);

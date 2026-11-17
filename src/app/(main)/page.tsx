@@ -18,7 +18,7 @@ import { pendingImports } from "@/services/health-import";
 import { dueSoon, lessonChoices } from "@/services/schoolwork";
 import { loadSkillTree } from "@/services/context";
 import { achievementList, attributeSummaries, characterSummary, medalCase, questBoard, unreadNotices } from "@/services/queries";
-import { activityHistory, sampleDataCount, suggestedNow, tiles, timerView, today, weekInReview, quickLogOptions, skillChoices, calendarInboxItems } from "@/services/views";
+import { activityHistory, sampleDataCount, suggestedNow, tiles, timerView, today, weekInReview, quickLogOptions, skillChoices, calendarInboxItems, withRevision } from "@/services/views";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +77,7 @@ export default function Overview() {
           </CardBody>
         </Card>
       )}
-      <DueSoon data={dueSoon(db, requestTime())} now={requestTime()} skills={skillChoices(db)} lessons={lessonChoices(db, requestTime())} />
+      <DueSoon data={dueSoonWithRevision(db, requestTime())} now={requestTime()} skills={skillChoices(db)} lessons={lessonChoices(db, requestTime())} />
       {pending.length > 0 && (
         <Card className="mb-4">
           <CardBody className="pt-5">
@@ -196,4 +196,9 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="font-medium">{value}</p>
     </div>
   );
+}
+
+function dueSoonWithRevision(db: ReturnType<typeof appDb>, now: number) {
+  const d = dueSoon(db, now);
+  return { ...d, tests: withRevision(db, d.tests, now) };
 }

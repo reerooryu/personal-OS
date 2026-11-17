@@ -49,6 +49,13 @@ export interface TestItem {
   assessmentId: string | null;
   noResult: boolean;
   hasResultType: boolean;
+  revision?: {
+    questId: string;
+    state: string;
+    reason: string | null;
+    minutes: { done: number; target: number };
+    days: { done: number; target: number } | null;
+  } | null;
 }
 
 const KINDS = { quiz: "Quiz", test: "Test", mock: "Mock exam", exam: "Exam" } as const;
@@ -546,6 +553,26 @@ export function HomeworkRow({ h, now, skills, lessons, compact }: { h: HomeworkI
 
 // ---------------------------------------------------------------- test row ---
 
+/** "Revision 30 / 90 min · 1 / 2 days", sized from the subject's grade and trend. */
+function RevisionBar({ r }: { r: NonNullable<TestItem["revision"]> }) {
+  const done = r.state === "completed";
+  const pct = r.minutes.target ? Math.min(100, (r.minutes.done / r.minutes.target) * 100) : 0;
+  return (
+    <a href={`/quests/${r.questId}`} title={r.reason ?? undefined} className="mt-2 block border-t border-line pt-2 text-[11px]">
+      <span className="flex items-center justify-between gap-2">
+        <span className={done ? "text-good" : "text-muted"}>{done ? "Revision done" : "Revision"}</span>
+        <span className="text-faint">
+          {r.minutes.done}/{r.minutes.target} min
+          {r.days ? ` · ${r.days.done}/${r.days.target} days` : ""}
+        </span>
+      </span>
+      <span className="mt-1 block h-1 overflow-hidden rounded-full bg-white/10">
+        <span className={cn("block h-full rounded-full", done ? "bg-good" : "bg-accent")} style={{ width: `${done ? 100 : pct}%` }} />
+      </span>
+    </a>
+  );
+}
+
 export function TestRow({ x, now, skills, lessons }: { x: TestItem; now: number; skills: SkillChoice[]; lessons: LessonChoices }) {
   const [score, setScore] = React.useState("");
   const [outOf, setOutOf] = React.useState("");
@@ -586,6 +613,7 @@ export function TestRow({ x, now, skills, lessons }: { x: TestItem; now: number;
           </button>
         )}
       />
+      {x.revision && !over && <RevisionBar r={x.revision} />}
       {needsResult && (
         <form
           data-track="test result"

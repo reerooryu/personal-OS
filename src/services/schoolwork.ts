@@ -11,11 +11,14 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { DB } from "@/db/client";
 import * as t from "@/db/schema";
-import { addDays } from "@/domain/time";
+import { gradeFor, normalize, proficiency } from "@/domain/proficiency";
+import { planRevision, type RevisionPlan } from "@/domain/revision";
+import { addDays, daysBetween } from "@/domain/time";
 import { createActivity, deleteActivity } from "./activities";
 import { occurrences, todayKey } from "./calendar";
+import { getProfile } from "./context";
 import { ValidationError, parse } from "./errors";
-import { createAssessment } from "./records";
+import { createAssessment, createQuest, deleteQuest } from "./records";
 
 const DAY = 86_400_000;
 
@@ -122,19 +125,22 @@ export function addTest(db: DB, input: TestInput, now = Date.now()) {
     createdAt: now,
   };
   db.insert(t.tests).values(row).run();
+  syncRevisionQuest(db, row.id, now);
   return row;
 }
 
-export function updateTest(db: DB, id: string, input: TestInput) {
+export function updateTest(db: DB, id: string, input: TestInput, now = Date.now()) {
   const x = parse(testInput, input);
   const s = skill(db, x.skillId);
   db.update(t.tests)
     .set({ title: x.title || `${s.name} ${TEST_KINDS[x.kind].toLowerCase()}`, kind: x.kind, skillId: x.skillId, startAt: x.startAt, durationMin: x.durationMin, notes: x.notes || null })
     .where(eq(t.tests.id, id))
     .run();
+  syncRevisionQuest(db, id, now);
 }
 
 export function deleteTest(db: DB, id: string) {
+  removeRevisionQuest(db, id);
   db.delete(t.tests).where(eq(t.tests.id, id)).run();
 }
 
@@ -285,7 +291,98 @@ export function importSchoolworkFromFile(db: DB, raw: { homework?: unknown[]; te
     db.insert(t.tests)
       .values({ id, title: x.title || `${s.name} ${TEST_KINDS[x.kind].toLowerCase()}`, kind: x.kind, skillId: x.subject, startAt: toUtc(x.date), durationMin: x.durationMin, notes: x.notes ?? null, createdAt: now })
       .run();
+    syncRevisionQuest(db, id, now);
     added++;
   }
   return added;
+}
+
+// -------------------------------------------------------- revision quests ---
+
+/**
+ * The subject's current grade and recent test percentages, for sizing a
+ * revision plan. Unrepresentative results (the Geography fluke) are left out.
+ */
+function subjectStanding(db: DB, skillId: string) {
+  const skill = db.select().from(t.skills).where(eq(t.skills.id, skillId)).get()!;
+  const types = db.select().from(t.measurementTypes).where(eq(t.measurementTypes.skillId, skillId)).all();
+  const assessments = db
+    .select()
+    .from(t.assessments)
+    .where(and(eq(t.assessments.skillId, skillId), isNull(t.assessments.deletedAt)))
+    .all()
+    .sort((a, b) => a.assessedAt - b.assessedAt || a.createdAt - b.createdAt);
+  const p = proficiency(skill.proficiencyModel, skill.primaryMeasurementTypeId, types, assessments);
+  const percentTypes = new Map(types.filter((m) => m.valueKind === "percent").map((m) => [m.id, m]));
+  const recentTests = assessments
+    .filter((a) => percentTypes.has(a.measurementTypeId) && !a.notRepresentative)
+    .map((a) => normalize(percentTypes.get(a.measurementTypeId)!, a.rawValue, a.rawLabel))
+    .filter((v): v is number => v !== null)
+    .slice(-3);
+  return { skill, score: p.score, grade: gradeFor(p.score, getProfile(db).gradeBands), recentTests };
+}
+
+/** Days left to revise: today through the day before the test, plus the test day if it's in the afternoon. */
+function daysToRevise(db: DB, startAt: number, now: number) {
+  const zone = getProfile(db).timezone;
+  const testDay = new Date(startAt).toLocaleDateString("en-CA", { timeZone: zone });
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", hourCycle: "h23" }).format(new Date(startAt)));
+  return Math.max(1, daysBetween(todayKey(db, now), testDay) + (hour >= 12 ? 1 : 0));
+}
+
+export function revisionPlanFor(db: DB, test: { skillId: string; kind: keyof typeof TEST_KINDS; startAt: number }, now = Date.now()): RevisionPlan {
+  const st = subjectStanding(db, test.skillId);
+  return planRevision({ subject: st.skill.name, kind: test.kind, grade: st.grade, score: st.score, recentTests: st.recentTests, daysAvailable: daysToRevise(db, test.startAt, now) });
+}
+
+function questCompleted(db: DB, questId: string) {
+  return !!db.select().from(t.questCompletions).where(eq(t.questCompletions.questId, questId)).get();
+}
+
+/** Removes a test's revision quest unless it was already completed (its reward stays earned). */
+function removeRevisionQuest(db: DB, testId: string) {
+  const x = db.select().from(t.tests).where(eq(t.tests.id, testId)).get();
+  if (!x?.revisionQuestId) return;
+  const q = db.select().from(t.quests).where(eq(t.quests.id, x.revisionQuestId)).get();
+  if (q && !questCompleted(db, q.id)) deleteQuest(db, q.id);
+  db.update(t.tests).set({ revisionQuestId: q && questCompleted(db, q.id) ? q.id : null }).where(eq(t.tests.id, testId)).run();
+}
+
+/**
+ * Creates (or recreates, after an edit) the revision quest for a test. The
+ * plan is sized once, when the test is added or changed, so the target
+ * doesn't move under Ryu's feet when a new result comes in. Study sessions in
+ * the subject (including homework ticked off with time) count from the moment
+ * the test was added until it starts.
+ */
+export function syncRevisionQuest(db: DB, testId: string, now = Date.now()) {
+  const x = db.select().from(t.tests).where(eq(t.tests.id, testId)).get();
+  if (!x) return null;
+  if (x.revisionQuestId && questCompleted(db, x.revisionQuestId)) return null;
+  removeRevisionQuest(db, testId);
+  if (x.startAt <= now) return null;
+  const st = subjectStanding(db, x.skillId);
+  const plan = revisionPlanFor(db, x, now);
+  const filter = { skillIds: [x.skillId], includeSubskills: true, ...(st.skill.attributeId === "academics" ? { activityTypeIds: ["study"] } : {}) };
+  const quest = createQuest(db, {
+    title: `Revise: ${x.title}`,
+    description: plan.reason,
+    kind: "long_term",
+    startAt: Math.min(x.createdAt, now),
+    endAt: x.startAt,
+    rewardXp: plan.minutes,
+    origin: "generated",
+    skills: [{ skillId: x.skillId, weight: 100 }],
+    requirements: [
+      { type: "duration", target: plan.minutes, title: `${plan.minutes} min of ${st.skill.name} study`, filter },
+      ...(plan.days > 1 ? [{ type: "distinct_days" as const, target: plan.days, title: `on ${plan.days} different days`, filter }] : []),
+    ],
+  });
+  db.update(t.tests).set({ revisionQuestId: quest.id }).where(eq(t.tests.id, testId)).run();
+  return { questId: quest.id, plan };
+}
+
+/** For tests added before revision quests existed. */
+export function backfillRevisionQuests(db: DB, now = Date.now()) {
+  for (const x of db.select().from(t.tests).all()) if (!x.revisionQuestId && x.startAt > now) syncRevisionQuest(db, x.id, now);
 }

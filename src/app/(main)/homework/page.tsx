@@ -13,7 +13,7 @@ import { appDb } from "@/services/bootstrap";
 import { currentWeek, todayKey } from "@/services/calendar";
 import { getProfile } from "@/services/context";
 import { homeworkBetween, lessonChoices, overdueHomework, testsAwaitingResult, testsBetween } from "@/services/schoolwork";
-import { skillChoices } from "@/services/views";
+import { skillChoices, withRevision } from "@/services/views";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +34,10 @@ export default async function HomeworkPage({ searchParams }: { searchParams: Pro
   const from = startOf(monday);
   const to = startOf(addDays(monday, 7));
   const homework = homeworkBetween(db, from, to);
-  const tests = testsBetween(db, from, to);
+  const tests = withRevision(db, testsBetween(db, from, to), now);
   const earlierOverdue = overdueHomework(db, now).filter((h) => h.dueAt < from);
   const results = testsAwaitingResult(db, now).filter((x) => x.startAt < from);
-  const later = testsBetween(db, to, to + 42 * DAY);
+  const later = withRevision(db, testsBetween(db, to, to + 42 * DAY), now);
   const skills = skillChoices(db);
   const lessons = lessonChoices(db, now);
   const week = currentWeek(db, monday);

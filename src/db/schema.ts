@@ -588,6 +588,8 @@ export const tests = sqliteTable(
     assessmentId: text("assessment_id"),
     /** Set when Ryu says there will be no result to enter. */
     noResult: bool("no_result").notNull().default(false),
+    /** The revision quest generated for this test, if any. */
+    revisionQuestId: text("revision_quest_id"),
   },
   (t) => [index("tests_start_idx").on(t.startAt)],
 );

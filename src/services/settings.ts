@@ -23,6 +23,8 @@ export interface Settings {
   timetableHash: string | null;
   /** When the calendar was first set up. "Did you go?" never asks about anything before it. */
   calendarSince: number | null;
+  /** One-time data fixes already applied (see data-fixes.ts). */
+  dataFixes: string[];
 }
 
 const DEFAULTS: Settings = {
@@ -36,6 +38,7 @@ const DEFAULTS: Settings = {
   appleSync: null,
   timetableHash: null,
   calendarSince: null,
+  dataFixes: [],
 };
 
 export function getSetting<K extends keyof Settings>(db: DB | Tx, key: K): Settings[K] {

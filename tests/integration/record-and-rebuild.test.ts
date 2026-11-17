@@ -37,7 +37,7 @@ describe.skipIf(!privateRecord)("Ryu's starting record", () => {
     expect(s.get("programming")!.level.level).toBe(8);
     expect(s.get("piano")).toMatchObject({ xp: 2500, proficiency: 63, grade: "C" });
     expect(s.get("piano")!.level.level).toBe(7);
-    expect(s.get("music-theory")).toMatchObject({ xp: 500, proficiency: 56, grade: "C" });
+    expect(s.has("music-theory")).toBe(false); // folded into Piano on 17 Nov 2026: the theory medal's 500 XP is in Piano's 2500
     expect(s.get("mathematics")).toMatchObject({ xp: 1592, grade: "S" });
     expect(s.get("mathematics")!.level.level).toBe(6);
     expect(s.get("english")).toMatchObject({ proficiency: 95, grade: "S" });
@@ -118,7 +118,7 @@ describe("rebuild invariant", () => {
       return seed / 2 ** 31;
     };
     const pick = <T>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)]!;
-    const skills = ["piano", "music-theory", "mathematics", "physics", "volleyball", "gym", "robotics", "programming"];
+    const skills = ["piano", "mathematics", "physics", "volleyball", "gym", "robotics", "programming"];
     const live: string[] = [];
     const dead: string[] = [];
     const assessments: string[] = [];

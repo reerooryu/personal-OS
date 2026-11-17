@@ -1,0 +1,1 @@
+ALTER TABLE `tests` ADD `revision_quest_id` text;

@@ -21,8 +21,26 @@ This builds `release/mac-arm64/ASCEND.app`. Drag it into Applications and open i
 - **Menu bar:** click the ASCEND icon for one-click logging, timers, and "Open at login".
 - **Anywhere on the Mac:** press **⌥⇧L** (Option-Shift-L) for a quick log: pick from dropdowns and press Log.
 - **In the app:** press **L** to log. Closing the window keeps ASCEND running in the menu bar. Quit from the menu bar or with ⌘Q.
-- **Updating:** after pulling new code, run `npm install && npm run package` again and replace the app in Applications. Your data is untouched.
+- **Updating:** after pulling new code, run `npm install && npm run package` again and replace the app in Applications. Your data is untouched. With the Mac helper (below) installed, this happens automatically.
 - A backup is written to the data folder once a day (the last 14 are kept). The server log is `server.log` in the same folder.
+
+## The Mac helper
+
+A small background helper on the Mac does the routine work so nobody has to type it: building and installing updates, copying the database for analysis, and committing. It **never pushes**: `git push` stays a human step.
+
+```bash
+bash ~/"Personal OS"/scripts/mac-agent/install.sh     # once
+bash ~/"Personal OS"/scripts/mac-agent/uninstall.sh   # to remove it
+```
+
+It runs as a launchd agent and watches `.sync/agent/requests/` (gitignored). A request names one of four fixed actions, never a command:
+
+- **deploy:** remove any listed files, `npm install` if the lockfile changed, typecheck, run the tests, back up the database, build, quit ASCEND, install the new app, reopen it, and commit. It stops at the first failure, so nothing is installed or committed unless the tests pass. It refuses to commit anything under `private/`, `evidence/`, `data/`, `.sync/`, or any `.db` or `.pdf` file. A notification says when it's done.
+- **snapshot:** copies the live database to `.sync/agent/out/ascend.db` with SQLite's online backup.
+- **status:** versions, git state, where the app is installed.
+- **cleanup:** deletes old hand-off files and `private/ascend-copy.db`.
+
+Results are written to `.sync/agent/results/` and logs to `.sync/agent/logs/`. Database backups taken before an update are in `~/Library/Application Support/ASCEND/backups/`.
 
 ## Calendar
 
@@ -34,6 +52,7 @@ The Calendar page shows the school timetable (Week 1 and Week 2), tutoring, one-
 - **Holidays:** "School only" closures pause lessons and duties. "Everything" pauses tutoring too (Christmas). Both are set per break in Settings.
 - **Now line:** a red line marks the current time across today, like Apple Calendar. ← and → change week on the Calendar and Homework pages, T jumps back to this week.
 - **Week 1 / Week 2** alternate every calendar week from the anchor in the file. A Sunday counts as part of the week after it. If the school's rotation ever disagrees (after a holiday, say), use **Swap Week 1 and 2** in Settings.
+- **Your own events:** **Add event** (or the + next to a day) adds a competition, a formal event, a study or club meetup, or plans with friends. Pick the day and times from dropdowns, or tick All day. An event that moves partway through ("VEX at school 3 to 6, then a friend's room until 7:30") is one event with two parts: **Then somewhere else** adds the next part. Pick the skill it trains and "Did you go?" asks afterwards, once per part. Competitions log as competitions. Friends' plans and events with no skill are on the calendar only, with no XP. All-day events show in a strip above the hours. Click any of your events to edit or delete it. Long sessions count at most eight hours.
 - **iPhone:** the timetable, tutoring and one-off events are written into a calendar called **ASCEND** in iCloud, eight weeks ahead, so they appear in Apple Calendar on the iPhone next to the SOCS events. The first sync asks for Calendar access. This needs the Swift compiler on the Mac when packaging (`xcode-select --install` if `npm run package` says it skipped the calendar helper). Because the app isn't signed with a developer certificate, macOS may ask for Calendar access again after a rebuild.
 
 ## Homework and tests
@@ -60,7 +79,7 @@ Strava isn't used: its API now needs a paid plan for apps like this, and its ter
 
 ## Usage log
 
-ASCEND records how it's used (pages opened, buttons clicked, dropdown choices, which fields were edited, how long logging takes, forms left unfinished, errors) so the app can be made easier to use. It never records what is typed. Ryu can see a summary, export it as CSV or JSON, clear it or switch it off in **Settings → Usage log**. Events older than a year are deleted.
+ASCEND records how it's used (pages opened, buttons clicked, dropdown choices, which fields were edited, how long logging takes, forms left unfinished, errors) so the app can be made easier to use. A session is a stretch of use: 30 minutes with nothing happening starts a new one, even if the window stayed open. It never records what is typed. Ryu can see a summary, export it as CSV or JSON, clear it or switch it off in **Settings → Usage log**. Events older than a year are deleted.
 
 ## Stress testing
 
@@ -130,8 +149,10 @@ See [ARCHITECTURE.md](ARCHITECTURE.md). In short: activities, assessments and ot
 - Dropdown logger replaces typed entry everywhere (Overview, Activities, the L dialog, the ⌥⇧L window)
 - Apple Health workout import for the Garmin watch, with a review list and per-type rules
 - Usage log with a friction summary and CSV/JSON export
-- 144 tests, including a randomized stress test
-- Revision quests for tests, sized by grade and trend
+- 152 tests, including a randomized stress test
+- Revision quests for tests, sized by grade and trend (none for a test under 12 hours away)
+- Ryu's own calendar events: competitions, formal events, meetups and friends, in one or more parts, synced to the iPhone
+- The Mac helper: automatic build, install, database snapshot and commit (never push)
 - Music Theory folded into Piano (17 Nov 2026): its history and the Grade 5 certificate now sit under Piano
 
 ## Implemented in Milestone 1

@@ -335,6 +335,8 @@ export function revisionPlanFor(db: DB, test: { skillId: string; kind: keyof typ
   return planRevision({ subject: st.skill.name, kind: test.kind, grade: st.grade, score: st.score, recentTests: st.recentTests, daysAvailable: daysToRevise(db, test.startAt, now) });
 }
 
+export const MIN_REVISION_LEAD_MS = 12 * 3_600_000;
+
 function questCompleted(db: DB, questId: string) {
   return !!db.select().from(t.questCompletions).where(eq(t.questCompletions.questId, questId)).get();
 }
@@ -360,7 +362,8 @@ export function syncRevisionQuest(db: DB, testId: string, now = Date.now()) {
   if (!x) return null;
   if (x.revisionQuestId && questCompleted(db, x.revisionQuestId)) return null;
   removeRevisionQuest(db, testId);
-  if (x.startAt <= now) return null;
+  // Under 12 hours to go there's no real time to revise: no quest he can't win.
+  if (x.startAt - now < MIN_REVISION_LEAD_MS) return null;
   const st = subjectStanding(db, x.skillId);
   const plan = revisionPlanFor(db, x, now);
   const filter = { skillIds: [x.skillId], includeSubskills: true, ...(st.skill.attributeId === "academics" ? { activityTypeIds: ["study"] } : {}) };

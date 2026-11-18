@@ -54,6 +54,25 @@ export function usageEvents(db: DB, sinceMs = 0) {
   return db.select().from(t.usageEvents).where(gte(t.usageEvents.at, sinceMs)).orderBy(t.usageEvents.at).all();
 }
 
+/** A new session starts after this much inactivity. */
+export const SESSION_GAP_MS = 30 * 60_000;
+
+/**
+ * Counts sessions as bursts of use. Ryu leaves the app open for days (one
+ * page load ran from Monday evening to Tuesday night), so a page load is not
+ * a session: 30 minutes without any event is.
+ */
+export function countSessions(times: number[]): number {
+  const sorted = [...times].sort((a, b) => a - b);
+  let n = 0;
+  let last = -Infinity;
+  for (const at of sorted) {
+    if (at - last > SESSION_GAP_MS) n++;
+    last = at;
+  }
+  return n;
+}
+
 const median = (xs: number[]) => {
   if (!xs.length) return null;
   const s = [...xs].sort((a, b) => a - b);
@@ -83,7 +102,7 @@ export function usageSummary(db: DB, now = Date.now(), days = 7) {
     days,
     totalStored: total,
     events: ev.length,
-    sessions: new Set(ev.map((e) => e.sessionId)).size,
+    sessions: countSessions(ev.map((e) => e.at)),
     logs: logs.length,
     medianLogMs: median(logs.map((e) => e.ms).filter((m): m is number => m != null)),
     abandoned: ev.filter((e) => e.kind === "abandon").length,

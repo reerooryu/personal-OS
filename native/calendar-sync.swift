@@ -17,6 +17,8 @@ struct Item: Decodable {
     let notes: String
     let start: Double
     let end: Double
+    /// All-day events: EventKit takes the day's start and treats the end as inclusive.
+    let allDay: Bool?
 }
 
 struct Plan: Decodable {
@@ -122,15 +124,20 @@ do {
     for item in plan.items {
         let key = keyOf(item.uid)
         wanted.insert(key)
+        let allDay = item.allDay ?? false
         let start = Date(timeIntervalSince1970: item.start / 1000)
-        let end = Date(timeIntervalSince1970: item.end / 1000)
+        // An all-day event's end is the same day: the next midnight would make it two days.
+        let end = allDay ? start : Date(timeIntervalSince1970: item.end / 1000)
         if let e = existing[key] {
-            if e.title != item.title || (e.location ?? "") != (item.location ?? "") || (e.notes ?? "") != item.notes || e.startDate != start || e.endDate != end {
+            let timesDiffer = allDay ? (!e.isAllDay || e.startDate != start) : (e.isAllDay || e.startDate != start || e.endDate != end)
+            if e.title != item.title || (e.location ?? "") != (item.location ?? "") || (e.notes ?? "") != item.notes || timesDiffer {
                 e.title = item.title
                 e.location = item.location
                 e.notes = item.notes
+                e.isAllDay = allDay
                 e.startDate = start
                 e.endDate = end
+                e.timeZone = allDay ? nil : zone
                 try store.save(e, span: .thisEvent, commit: false)
                 updated += 1
             }
@@ -140,9 +147,10 @@ do {
             e.title = item.title
             e.location = item.location
             e.notes = item.notes
+            e.isAllDay = allDay
             e.startDate = start
             e.endDate = end
-            e.timeZone = zone
+            e.timeZone = allDay ? nil : zone
             guard let url = URL(string: marker + key) else { fail("Couldn't mark event \(item.uid)") }
             e.url = url
             try store.save(e, span: .thisEvent, commit: false)

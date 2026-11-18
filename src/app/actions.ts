@@ -23,7 +23,7 @@ import {
 import { appDb } from "@/services/bootstrap";
 import { getOpenedDb, dataDir } from "@/db/client";
 import { backupTo } from "@/services/data";
-import { answerCalendar, feedUrl, flipWeek, refreshFeed, setBreakScope, setCalendarRule, type CalendarAnswer } from "@/services/calendar";
+import { answerCalendar, deleteEvent, feedUrl, flipWeek, refreshFeed, saveEvent, setBreakScope, setCalendarRule, type CalendarAnswer, type EventInput } from "@/services/calendar";
 import { verify } from "@/services/engine";
 import {
   decideImport,
@@ -461,6 +461,26 @@ export async function returnToReviewAction(itemId: string): Promise<Result> {
 }
 
 // ---------------------------------------------------------------- calendar ---
+
+export async function saveEventAction(groupId: string | null, input: EventInput): Promise<Result> {
+  try {
+    saveEvent(appDb(), groupId, input);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteEventAction(groupId: string): Promise<Result> {
+  try {
+    deleteEvent(appDb(), groupId);
+    done();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
 
 export async function answerCalendarAction(a: CalendarAnswer): Promise<Rewarded> {
   try {

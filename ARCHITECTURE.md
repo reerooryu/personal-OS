@@ -95,7 +95,13 @@ Every workout read from an Apple Health export becomes an `import_items` row, ke
 
 Occurrences are never stored. They are expanded on read from the timetable slots (rotation week from `weekAnchor`, Sundays count with the following week, breaks pause by scope), the one-off events, and the cached SOCS feed (`external_events`, replaced on each fetch, never exported). An occurrence key (`tt:<slot>:<date>`, `ev:<id>`, `feed:<uid>`) links it to its answer in `calendar_confirmations`. Logging uses `cal:<key>` as the client request id, so answering twice can't double-log.
 
+`calendar_events` holds two kinds of one-off event. `origin = "file"` rows come from `private/timetable.json` and are replaced on every import of it. `origin = "app"` rows are Ryu's own and are never touched by the file. An event in several parts is one row per part sharing `group_id`. `kind` (event, competition, meetup, friends) sets the color and the XP: friends and events with no skill are `xp = none`, so they are never asked about. A competition logs with the `competition` activity type. All-day events are midnight to midnight, shown in a strip above the hours, and sent to EventKit with `isAllDay`.
+
 The desktop app pulls `/api/calendar/outbox` and pipes it to `native/calendar-sync.swift` (EventKit), which makes the "ASCEND" calendar match the plan for the window, touching only events marked `ascend://event/…`.
+
+## The Mac helper (`scripts/mac-agent/`)
+
+Claude works in a Linux sandbox that can write into the repo folder but can't run macOS tools, so routine work on the Mac goes through a launchd agent. `install.sh` records the Terminal's PATH (Homebrew, nvm) and the app's location in `.sync/agent/env.sh`, and loads `~/Library/LaunchAgents/com.ryu.ascend.agent.plist`, which runs `run.sh` → `agent.mjs` whenever `.sync/agent/requests/` changes, and every minute. `agent.mjs` takes a lock, handles each request file once (moving it to `done/`), and writes `results/<id>.json` and `logs/<id>.log`. It runs programs without a shell, knows four actions only, keeps file removal inside the repo, and checks the staged file list against the private-file patterns before every commit. It has no push action. The app quits cleanly on SIGTERM so the helper can replace it.
 
 ## One-time data fixes (`src/services/data-fixes.ts`)
 

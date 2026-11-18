@@ -5,13 +5,14 @@
  * The calendar holds plans. An occurrence only becomes an activity when Ryu
  * answers "Did you go?". Lessons never ask and never earn XP.
  */
-import { and, eq, isNull } from "drizzle-orm";
-import { createHash } from "node:crypto";
+import { and, eq, isNull, or } from "drizzle-orm";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { DB } from "@/db/client";
 import * as t from "@/db/schema";
 import { breakOn, expandSlots, parseClock, parseIcs, rotationWeek, weekdayOf, type Break, type FeedEvent, type Slot, type XpMode } from "@/domain/calendar";
 import { addDays, localToUtc } from "@/domain/time";
+import { MAX_DURATION_MIN } from "@/domain/defaults";
 import type { Difficulty } from "@/domain/types";
 import { createActivity } from "./activities";
 import { getProfile } from "./context";
@@ -41,7 +42,13 @@ export interface Occurrence {
   needsSkill: boolean;
   status: "done" | "skipped" | null;
   activityId: string | null;
+  /** For events: what kind (colors the calendar), the group of its parts, and whether Ryu added it. */
+  category?: EventKind;
+  groupId?: string | null;
+  mine?: boolean;
 }
+
+export type EventKind = "event" | "competition" | "meetup" | "friends";
 
 function tz(db: DB) {
   return getProfile(db).timezone;
@@ -197,13 +204,16 @@ export function occurrences(db: DB, fromDate: string, toDate: string): Occurrenc
       location: e.location,
       startAt: e.startAt,
       endAt: e.endAt,
-      allDay: false,
+      allDay: e.allDay,
       week: anchor ? rotationWeek(localDate(e.startAt, zone), anchor) : null,
       skillId: e.skillId,
-      xp: e.xp,
-      activityTypeId: e.xp === "small" ? "light" : "practice",
+      xp: e.allDay ? "none" : e.xp,
+      activityTypeId: e.activityTypeId ?? (e.xp === "small" ? "light" : "practice"),
       cancelled: false,
       needsSkill: false,
+      category: e.kind,
+      groupId: e.groupId ?? e.id,
+      mine: e.origin === "app",
       ...status(key),
     });
   }
@@ -362,7 +372,7 @@ export function answerCalendar(db: DB, ans: CalendarAnswer, now = Date.now()) {
       name: o.title,
       notes: o.location ? `From the calendar · ${o.location}` : "From the calendar",
       startAt: o.startAt,
-      durationMin: Math.max(1, Math.round((o.endAt - o.startAt) / 60_000)),
+      durationMin: Math.min(MAX_DURATION_MIN, Math.max(1, Math.round((o.endAt - o.startAt) / 60_000))),
       activityTypeId: small ? "light" : type,
       difficulty: (small ? "very_easy" : "normal") as Difficulty,
       skills: [{ skillId, weight: 100 }],
@@ -428,7 +438,10 @@ export interface OutboxItem {
   notes: string;
   start: number;
   end: number;
+  allDay?: boolean;
 }
+
+const CATEGORY_LABEL: Record<EventKind, string> = { event: "Event", competition: "Competition", meetup: "Meetup", friends: "Friends" };
 
 const KIND_LABEL: Record<OccurrenceKind, string> = { lesson: "Lesson", tutoring: "Tutoring", duty: "School duty", event: "Event", school: "School", test: "Test" };
 
@@ -441,15 +454,22 @@ export function appleOutbox(db: DB, now = Date.now()) {
   const today = todayKey(db, now);
   const from = addDays(today, -7);
   const to = addDays(today, 56);
+  const notes = new Map(db.select({ id: t.calendarEvents.id, notes: t.calendarEvents.notes }).from(t.calendarEvents).all().map((e) => [`ev:${e.id}`, e.notes]));
   const items: OutboxItem[] = occurrences(db, from, to)
     .filter((o) => o.source !== "feed")
     .map((o) => ({
       uid: o.key,
       title: o.title,
       location: o.location,
-      notes: [KIND_LABEL[o.kind], o.week ? `Week ${o.week}` : null, "Added by ASCEND"].filter(Boolean).join(" · "),
+      notes: [
+        notes.get(o.key),
+        [o.category ? CATEGORY_LABEL[o.category] : KIND_LABEL[o.kind], o.week ? `Week ${o.week}` : null, "Added by ASCEND"].filter(Boolean).join(" · "),
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
       start: o.startAt,
       end: o.endAt,
+      ...(o.allDay ? { allDay: true } : {}),
     }));
   const zone = tz(db);
   const fromMs = localToUtc(zone, ...ymd(from));
@@ -556,7 +576,7 @@ export function importTimetable(db: DB, raw: unknown, now = Date.now()) {
   });
   db.transaction((tx) => {
     tx.delete(t.timetableSlots).run();
-    tx.delete(t.calendarEvents).run();
+    tx.delete(t.calendarEvents).where(eq(t.calendarEvents.origin, "file")).run();
     tx.delete(t.schoolBreaks).run();
     for (const s of slots) tx.insert(t.timetableSlots).values(s).run();
     for (const e of events) tx.insert(t.calendarEvents).values(e).run();
@@ -598,4 +618,128 @@ export function upcomingTimetableCount(db: DB) {
 /** Confirmations for a day, used to undo. */
 export function undoAnswer(db: DB, key: string) {
   db.delete(t.calendarConfirmations).where(and(eq(t.calendarConfirmations.occurrenceKey, key), eq(t.calendarConfirmations.status, "skipped"))).run();
+}
+
+// ---------------------------------------------------------- Ryu's own events ---
+
+const eventInput = z
+  .object({
+    title: z.string().trim().min(1, "Give it a name").max(120),
+    kind: z.enum(["event", "competition", "meetup", "friends"]),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a day"),
+    allDay: z.boolean().default(false),
+    /** One or more parts in order, such as school 15:00–18:00 then a friend's room 18:00–19:30. */
+    parts: z
+      .array(z.object({ start: z.string(), end: z.string(), location: z.string().trim().max(120).nullish() }))
+      .min(1)
+      .max(4),
+    /** The skill it trains, for "Did you go?". None means it's on the calendar only. */
+    skillId: z.string().nullish(),
+    notes: z.string().trim().max(2000).nullish(),
+  })
+  .superRefine((e, ctx) => {
+    if (e.allDay) return;
+    let last = -1;
+    e.parts.forEach((p, i) => {
+      const s = /^\d{1,2}:\d{2}$/.test(p.start) ? parseClock(p.start) : NaN;
+      const en = /^\d{1,2}:\d{2}$/.test(p.end) ? parseClock(p.end) : NaN;
+      if (!(en > s)) ctx.addIssue({ code: "custom", path: ["parts", i, "end"], message: "Each part must end after it starts" });
+      if (s < last) ctx.addIssue({ code: "custom", path: ["parts", i, "start"], message: "Parts must be in order" });
+      last = en;
+    });
+  });
+export type EventInput = z.input<typeof eventInput>;
+
+/** Friends' plans never count for XP: they're on the calendar so the day is planned, not to be scored. */
+function eventXp(kind: EventKind, skillId: string | null): XpMode {
+  return kind === "friends" || !skillId ? "none" : "normal";
+}
+
+/** Saves one of Ryu's events, replacing every part of `groupId` when editing. */
+export function saveEvent(db: DB, groupId: string | null, raw: EventInput) {
+  const p = eventInput.safeParse(raw);
+  if (!p.success) throw ValidationError.one(String(p.error.issues[0]?.path.join(".") ?? "event"), p.error.issues[0]?.message ?? "Check the event");
+  const e = p.data;
+  if (e.skillId) {
+    const s = db.select().from(t.skills).where(eq(t.skills.id, e.skillId)).get();
+    if (!s || s.kind === "trait") throw ValidationError.one("skillId", "Pick a skill");
+  }
+  if (groupId) {
+    const existing = eventParts(db, groupId);
+    if (!existing.length || existing.some((x) => x.origin !== "app")) throw ValidationError.one("id", "That event can't be edited here");
+  }
+  const zone = tz(db);
+  const [y, m, d] = ymd(e.date);
+  const skillId = e.kind === "friends" ? null : (e.skillId ?? null);
+  const xp = eventXp(e.kind, skillId);
+  const activityTypeId = skillId ? (e.kind === "competition" ? "competition" : defaultType(db, skillId, e.title.toLowerCase())) : null;
+  const gid = groupId ?? randomUUID();
+  const rows = (e.allDay ? [{ start: "00:00", end: "00:00", location: e.parts[0]?.location }] : e.parts).map((part, i) => {
+    const s = e.allDay ? 0 : parseClock(part.start);
+    const en = e.allDay ? 24 * 60 : parseClock(part.end);
+    const startAt = localToUtc(zone, y, m, d, Math.floor(s / 60), s % 60);
+    const endAt = e.allDay ? localToUtc(zone, ...ymd(addDays(e.date, 1))) : localToUtc(zone, y, m, d, Math.floor(en / 60), en % 60);
+    return {
+      id: `${gid}-${i + 1}`,
+      title: e.title,
+      location: part.location || null,
+      startAt,
+      endAt,
+      skillId,
+      xp,
+      origin: "app" as const,
+      kind: e.kind,
+      allDay: e.allDay,
+      groupId: gid,
+      activityTypeId,
+      notes: e.notes || null,
+    };
+  });
+  db.transaction((tx) => {
+    tx.delete(t.calendarEvents).where(eq(t.calendarEvents.groupId, gid)).run();
+    for (const r of rows) tx.insert(t.calendarEvents).values(r).run();
+  });
+  return { groupId: gid, parts: rows.length };
+}
+
+/** Every part of an event: by its group, or the single row of a file event that has none. */
+function eventParts(db: DB, groupId: string) {
+  return db.select().from(t.calendarEvents).where(or(eq(t.calendarEvents.groupId, groupId), eq(t.calendarEvents.id, groupId))).all();
+}
+
+export function deleteEvent(db: DB, groupId: string) {
+  const rows = eventParts(db, groupId);
+  if (!rows.length) return;
+  if (rows.some((x) => x.origin !== "app")) throw ValidationError.one("id", "That event comes from the timetable file");
+  db.delete(t.calendarEvents).where(eq(t.calendarEvents.groupId, groupId)).run();
+}
+
+/** Ryu's events on days `from` to `to` (inclusive), in a form the event dialog can edit, keyed by group. */
+export function editableEvents(db: DB, from: string, to: string) {
+  const zone = tz(db);
+  const fromMs = localToUtc(zone, ...ymd(from));
+  const toMs = localToUtc(zone, ...ymd(addDays(to, 1)));
+  const clock = (ms: number) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(ms));
+  const groups = new Map<string, (typeof t.calendarEvents.$inferSelect)[]>();
+  for (const r of db.select().from(t.calendarEvents).where(eq(t.calendarEvents.origin, "app")).all()) {
+    if (r.endAt <= fromMs || r.startAt >= toMs) continue;
+    const g = r.groupId ?? r.id;
+    groups.set(g, [...(groups.get(g) ?? []), r]);
+  }
+  const out: Record<string, EventInput & { groupId: string }> = {};
+  for (const [g, parts] of groups) {
+    parts.sort((a, b) => a.startAt - b.startAt);
+    const f = parts[0]!;
+    out[g] = {
+      groupId: g,
+      title: f.title,
+      kind: f.kind,
+      date: localDate(f.startAt, zone),
+      allDay: f.allDay,
+      parts: parts.map((p) => ({ start: clock(p.startAt), end: p.allDay ? "23:59" : clock(p.endAt), location: p.location })),
+      skillId: f.skillId,
+      notes: f.notes,
+    };
+  }
+  return out;
 }

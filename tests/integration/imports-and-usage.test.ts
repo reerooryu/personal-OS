@@ -210,8 +210,10 @@ describe("usage log", () => {
       NOW,
     );
     expect(n).toBe(9);
+    // One page load spanning a whole evening with a long gap is two sessions.
+    recordUsage(db, [ev("click", "a", { at: NOW - 3 * 3_600_000, sessionId: "s2" }), ev("click", "b", { at: NOW - 3 * 3_600_000 + 10 * 60_000, sessionId: "s2" })], NOW);
     const s = usageSummary(db, NOW);
-    expect(s).toMatchObject({ events: 9, sessions: 1, logs: 3, medianLogMs: 2000, abandoned: 1, warnings: 1, errors: 1, topPages: [{ path: "/", views: 2, avgSec: 20 }] });
+    expect(s).toMatchObject({ events: 11, sessions: 2, logs: 3, medianLogMs: 2000, abandoned: 1, warnings: 1, errors: 1, topPages: [{ path: "/", views: 2, avgSec: 20 }] });
     expect(db.select().from(t.usageEvents).all().every((e) => e.name.length <= 80)).toBe(true);
     expect(usageCsv(db).split("\n")[0]).toBe("time,session,kind,name,path,ms,meta");
     clearUsage(db);

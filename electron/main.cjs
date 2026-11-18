@@ -467,3 +467,9 @@ app.on("will-quit", () => {
   if (server) server.kill();
 });
 app.on("window-all-closed", (e) => e.preventDefault());
+// The Mac helper quits the app with SIGTERM before installing an update: quit
+// properly so the server child stops and the database closes cleanly.
+process.on("SIGTERM", () => {
+  quitting = true;
+  app.quit();
+});

@@ -500,7 +500,12 @@ export const timetableSlots = sqliteTable("timetable_slots", {
   xp: text("xp", { enum: ["none", "normal", "small"] }).notNull(),
 });
 
-/** One-off events (an exam, a trip). */
+/**
+ * One-off events: from the private timetable file (an exam), or added by Ryu
+ * in the app (a competition, a VEX session, plans with friends). An event in
+ * several parts ("school 3 to 6, then a friend's room until 7:30") is one row
+ * per part sharing a groupId.
+ */
 export const calendarEvents = sqliteTable("calendar_events", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
@@ -509,6 +514,13 @@ export const calendarEvents = sqliteTable("calendar_events", {
   endAt: integer("end_at").notNull(),
   skillId: text("skill_id"),
   xp: text("xp", { enum: ["none", "normal", "small"] }).notNull(),
+  /** "file" rows are replaced when the timetable file changes. "app" rows are Ryu's and never touched by it. */
+  origin: text("origin", { enum: ["file", "app"] }).notNull().default("file"),
+  kind: text("kind", { enum: ["event", "competition", "meetup", "friends"] }).notNull().default("event"),
+  allDay: bool("all_day").notNull().default(false),
+  groupId: text("group_id"),
+  activityTypeId: text("activity_type_id"),
+  notes: text("notes"),
 });
 
 /** Holidays and closures. "school" pauses lessons and duties; "everything" pauses tutoring too. */

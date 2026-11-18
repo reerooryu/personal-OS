@@ -26,4 +26,7 @@ evidence/
 
 # Desktop app builds
 dist-app/
+
+# Hand-off folders between Claude and the Mac (may hold database snapshots)
 .sync/
+Claude outputs/

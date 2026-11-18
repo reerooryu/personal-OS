@@ -90,10 +90,11 @@ describe("revision quests", () => {
     expect(db.select().from(t.quests).where(eq(t.quests.id, done.id)).get()).toBeDefined(); // the reward stays earned
   });
 
-  it("a test already started or past gets no quest", () => {
+  it("a test already started, past, or under 12 hours away gets no quest", () => {
     const db = seededDb();
-    const x = addTest(db, { skillId: "biology", startAt: NOW - H }, NOW);
-    expect(questOf(db, x.id)).toBeUndefined();
+    expect(questOf(db, addTest(db, { skillId: "biology", startAt: NOW - H }, NOW).id)).toBeUndefined();
+    expect(questOf(db, addTest(db, { skillId: "biology", startAt: NOW + 11 * H }, NOW).id)).toBeUndefined();
+    expect(questOf(db, addTest(db, { skillId: "biology", startAt: NOW + 13 * H }, NOW).id)).toBeDefined();
   });
 });
 

@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { DidYouGo } from "@/components/calendar/did-you-go";
+import { AddEventButton, EventEditor } from "@/components/calendar/event-editor";
 import { FeedRefresher } from "@/components/calendar/feed-refresher";
 import { Legend, WeekGrid } from "@/components/calendar/week-grid";
 import { WeekKeys } from "@/components/calendar/week-keys";
@@ -11,7 +12,7 @@ import { addDays } from "@/domain/time";
 import { requestTime } from "@/lib/clock";
 import { dateLabel, timeLabel } from "@/lib/utils";
 import { appDb } from "@/services/bootstrap";
-import { calendarWeek, todayKey, upcomingTimetableCount } from "@/services/calendar";
+import { calendarWeek, editableEvents, todayKey, upcomingTimetableCount } from "@/services/calendar";
 import { getSetting } from "@/services/settings";
 import { calendarInboxItems, skillChoices } from "@/services/views";
 
@@ -29,25 +30,34 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const inbox = calendarInboxItems(db, now);
   const hasTimetable = upcomingTimetableCount(db) > 0;
   const nav = (d: string) => `/calendar?date=${d}`;
+  const mine = editableEvents(db, w.monday, addDays(w.monday, 6));
+  const skills = skillChoices(db);
   const monthLabel = new Date(`${w.monday}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
   return (
+    <EventEditor events={mine} skills={skills}>
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Calendar"
         subtitle="Plans live here. A session only becomes an activity when you say you went."
-        action={<FeedRefresher connected={!!feed} stale={!last || now - last.at > 30 * 60_000} />}
+        action={
+          <div className="flex items-center gap-2">
+            <AddEventButton />
+            <FeedRefresher connected={!!feed} stale={!last || now - last.at > 30 * 60_000} />
+          </div>
+        }
       />
       {inbox.length > 0 && (
         <Card className="mb-5">
           <CardBody className="pt-5">
-            <DidYouGo items={inbox} skills={skillChoices(db)} />
+            <DidYouGo items={inbox} skills={skills} />
           </CardBody>
         </Card>
       )}
-      {!hasTimetable && !feed ? (
-        <Empty>No timetable yet. Add private/timetable.json, or connect the school calendar in Settings.</Empty>
-      ) : (
+      {!hasTimetable && !feed && (
+        <Empty>No timetable yet. Add private/timetable.json, or connect the school calendar in Settings. You can still add your own events.</Empty>
+      )}
+      {(
         <>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -77,10 +87,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                   ? `School calendar updated ${dateLabel(last.at)}, ${timeLabel(last.at)}.`
                   : "School calendar not read yet."
               : "School calendar not connected. Add the SOCS link in Settings."}{" "}
-            Use ← and → to change week, T for this week.
+            Use ← and → to change week, T for this week. Click one of your events to edit it.
           </p>
         </>
       )}
     </div>
+    </EventEditor>
   );
 }
